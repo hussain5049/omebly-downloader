@@ -75,7 +75,7 @@ async function renderSettings() {
       <div class="line"><div style="flex:1"><div>Downloads at the same time</div></div><input class="num" id="s-once" type="number" min="1" max="10" value="${s.at_once}"></div></div>
     <div class="card wide"><h3>Engines</h3>
       <div class="line"><div style="flex:1;min-width:0"><div>Site reader (yt-dlp)</div><div class="sub">${tools.ytdlp ? esc(tools.ytdlp) : 'Not found: YouTube and streams cannot download'}</div></div></div>
-      <div class="line"><div style="flex:1;min-width:0"><div>Video joiner (FFmpeg)</div><div class="sub">${tools.ffmpeg ? esc(tools.ffmpeg) : 'Not found: video and audio stay in separate files'}</div></div></div></div>
+      <div class="line"><div style="flex:1;min-width:0"><div>Video joiner (FFmpeg, GPL-3.0: source at github.com/FFmpeg/FFmpeg, commit 089a48eb36)</div><div class="sub">${tools.ffmpeg ? esc(tools.ffmpeg) : 'Not found: video and audio stay in separate files'}</div></div></div></div>
     <div class="card wide"><h3>Browser extension and updates</h3>
       <div class="line"><div style="flex:1;min-width:0"><div>Extension folder</div><div class="sub">One time only: in chrome://extensions turn on Developer mode, click Load unpacked and choose this folder. After that the app updates the extension for you.</div></div><button class="btn" id="s-ext">Show folder</button></div>
       <div class="line"><div style="flex:1;min-width:0"><div>Updates</div><div class="sub" id="s-upd">The app checks omebly.com when it opens. Updates are signed, and nothing about you is sent.</div></div><button class="btn" id="s-check">Check now</button></div></div>
