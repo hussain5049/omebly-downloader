@@ -11,6 +11,9 @@ export function scanPage() {
   const extOf = (u) => { const m = /\.([a-z0-9]{2,5})(?:[?#]|$)/i.exec(new URL(u).pathname); return m ? m[1].toLowerCase() : ''; };
   const nameOf = (u) => { try { const p = decodeURIComponent(new URL(u).pathname.split('/').pop() || ''); return p.replace(/\.[a-z0-9]{2,5}$/i, ''); } catch { return ''; } };
   const pageTitle = clean(document.title);
+  // The page's own heading (a lecture's name) names a player better than the tab title ("Site | Lectures").
+  const h1 = [...document.querySelectorAll('h1, h2')].find((h) => { const r = h.getBoundingClientRect(); return r.width > 0 && clean(h.textContent).length > 3; });
+  const heading = h1 ? clean(h1.textContent) : '';
   const items = [];
   const byKey = new Map(), els = new Map();
   // The same video can be both a player and a link in a list (the lesson playing): kept once, with the player's
@@ -57,7 +60,7 @@ export function scanPage() {
     const sources = [el.currentSrc, el.getAttribute('src'), ...[...el.querySelectorAll('source')].map((s) => s.getAttribute('src'))].filter(Boolean).map(abs).filter(Boolean);
     const direct = sources.find((s) => !s.startsWith('blob:') && !s.startsWith('data:'));
     const isProtected = el.hasAttribute('data-omebly-drm') || !!el.mediaKeys;
-    const base = { kind, title: titleNear(el) || pageTitle, inView: inView(el), playing: !el.paused && !el.ended, duration: Number.isFinite(el.duration) ? el.duration : 0, width: el.videoWidth || 0, height: el.videoHeight || 0, thumb: el.getAttribute('poster') ? abs(el.getAttribute('poster')) : '', protected: isProtected };
+    const base = { kind, title: titleNear(el) || heading || pageTitle, inView: inView(el), playing: !el.paused && !el.ended, duration: Number.isFinite(el.duration) ? el.duration : 0, width: el.videoWidth || 0, height: el.videoHeight || 0, thumb: el.getAttribute('poster') ? abs(el.getAttribute('poster')) : '', protected: isProtected };
     if (direct) add({ ...base, src: direct, ext: extOf(direct) }, el);
     // Played from pieces (blob:): the stream itself is found by watching the network; the page address is a
     // second way for the app to read it.
@@ -86,5 +89,5 @@ export function scanPage() {
   // Their place on the page, top to bottom (so a course's lessons are numbered in their order).
   const placed = [...els.entries()].sort((a, b) => (a[1].compareDocumentPosition(b[1]) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
   placed.forEach(([it], i) => { it.pos = i; });
-  return { url: location.href, title: pageTitle, items, top: window === top, mse: document.documentElement.hasAttribute('data-omebly-mse') };
+  return { url: location.href, title: pageTitle, heading, items, top: window === top, mse: document.documentElement.hasAttribute('data-omebly-mse') };
 }

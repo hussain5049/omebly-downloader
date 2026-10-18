@@ -36,12 +36,13 @@ async function load() {
   const items = [], seen = new Set();
   for (const f of frames) for (const it of f.result?.items || []) if (!seen.has(it.kind + it.src)) { seen.add(it.kind + it.src); items.push(it); }
   // Streams seen on the network (videos played in pieces): listed when the page shows no address of its own.
-  const streams = await chrome.runtime.sendMessage({ type: 'streams', tabId: state.tab.id }).catch(() => []);
+  let streams = await chrome.runtime.sendMessage({ type: 'streams', tabId: state.tab.id }).catch(() => []);
+  streams = await groupStreams(streams || []);
   const pageStream = items.find((i) => i.stream && i.needsApp);
   for (const s of streams || []) {
     if (seen.has(s.kind + s.src)) continue;
     seen.add(s.kind + s.src);
-    items.push({ kind: s.kind, src: s.src, title: pageStream?.title || state.page.title, inView: !!pageStream?.inView, playing: !!pageStream?.playing, needsApp: s.stream, stream: s.stream, format: s.format, size: s.size, ext: s.stream ? (s.format === 'DASH' ? 'mpd' : 'm3u8') : '' , protected: items.some((i) => i.protected && (i.kind === 'video' || i.kind === 'audio')), sniffed: true });
+    items.push({ kind: s.kind, src: s.src, title: pageStream?.title || top?.heading || state.page.title, inView: !!pageStream?.inView, playing: !!pageStream?.playing, needsApp: s.stream, stream: s.stream, format: s.format, size: s.master ? 0 : s.size, height: s.height || 0, ext: s.stream ? (s.format === 'DASH' ? 'mpd' : 'm3u8') : '' , protected: items.some((i) => i.protected && (i.kind === 'video' || i.kind === 'audio')), sniffed: true });
   }
   // A player whose pieces were found on the network does not need the page-address entry as well.
   if (pageStream && (streams || []).some((s) => s.stream)) items.splice(items.indexOf(pageStream), 1);
@@ -66,6 +67,28 @@ function applyInfo(info) {
   for (const [u, x] of Object.entries(info)) if (x?.size) state.sizes[u] = x.size;
   state.items = state.items.filter((i) => { const x = info[i.src]; return !(x && i.fromLink && (x.type === 'text/html' || x.type === 'application/xhtml+xml')); });
   for (const s of [...state.chosen]) if (!state.items.some((i) => i.src === s)) state.chosen.delete(s);
+}
+
+// One video often comes as several HLS lists: a main list naming one list per quality (and per audio language).
+// The main list is kept as the video; the lists it names are folded into it (shown as its qualities).
+async function groupStreams(streams) {
+  const hls = streams.filter((s) => s.stream && s.format === 'HLS');
+  if (hls.length < 2) return streams;
+  const folded = new Set();
+  await Promise.all(hls.slice(0, 12).map(async (s) => {
+    try {
+      const text = await (await fetch(s.src, { credentials: 'omit' })).text();
+      if (!/#EXT-X-STREAM-INF/i.test(text)) return;
+      const heights = [];
+      text.split(/\r?\n/).forEach((line, i, all) => {
+        const m = /RESOLUTION=\d+x(\d+)/i.exec(line); if (m) heights.push(+m[1]);
+        const uri = /URI="([^"]+)"/i.exec(line)?.[1] || (/^#EXT-X-STREAM-INF/i.test(all[i - 1] || '') && line && !line.startsWith('#') ? line.trim() : '');
+        if (uri) { try { folded.add(new URL(uri, s.src).href); } catch { /* not an address */ } }
+      });
+      s.master = true; if (heights.length) s.height = Math.max(...heights);
+    } catch { /* the stream answers only the site's own player: kept as it is */ }
+  }));
+  return streams.filter((s) => !folded.has(s.src));
 }
 
 function ofKind(kind = state.kind) { return state.items.filter((i) => i.kind === kind); }

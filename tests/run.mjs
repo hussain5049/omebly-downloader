@@ -74,7 +74,8 @@ const shot = (panel, name) => panel.screenshot({ path: join(OUT, `${name}.png`) 
 {
   const { page, panel } = await panelFor(`${SITE}/stream.html`, 3000);
   const s = await read(panel); await shot(panel, '2-stream');
-  ok('stream: the HLS stream is found on the network', s.rows.some((r) => r.pills.includes('HLS')), JSON.stringify(s.rows));
+  ok('stream: the stream is found on the network, and its main list and two quality lists show as one 720p video', s.rows.length === 1 && s.rows[0].pills.includes('720p'), JSON.stringify(s.rows));
+  ok('stream: it is named from the page heading, not the tab title', s.rows[0]?.name === 'Knife skills for beginners', JSON.stringify(s.rows));
   ok('stream: it is marked as needing the app, with a note', s.rows.some((r) => r.pills.includes('Uses the app')) && /needs? the Omebly Downloader app/.test(s.note), JSON.stringify(s));
   await page.close(); await panel.close();
 }

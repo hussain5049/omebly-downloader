@@ -3,16 +3,19 @@
 <head><meta charset="utf-8"><title>Live cooking class (stream)</title>
 <style>body{font:15px system-ui;margin:24px}video{width:720px;background:#111;border-radius:12px}</style></head>
 <body>
-<h1>Live cooking class</h1>
-<video id="v" muted playsinline controls title="Live cooking class"></video>
+<h1>Knife skills for beginners</h1>
+<video id="v" muted playsinline controls></video>
 <script>
 // Plays from pieces like most video sites: a Media Source (the address becomes "blob:") fed by an HLS stream.
 const v = document.getElementById('v'), ms = new MediaSource();
 v.src = URL.createObjectURL(ms);
 ms.addEventListener('sourceopen', async () => {
   try { ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'); } catch (e) { /* only the pieces matter for the test */ }
-  const list = await (await fetch('/media/hls/stream.m3u8')).text();
-  for (const line of list.split('\n')) if (line && !line.startsWith('#')) await fetch('/media/hls/' + line);
+  // Like a real player: the main list, the lists for each quality, then the pieces of one of them.
+  await fetch('/media/abr/master.m3u8');
+  const list = await (await fetch('/media/abr/v0.m3u8')).text();
+  await fetch('/media/abr/v1.m3u8');
+  for (const line of list.split('\n')) if (line && !line.startsWith('#')) await fetch('/media/abr/' + line);
 });
 </script>
 </body>
