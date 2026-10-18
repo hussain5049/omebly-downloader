@@ -68,7 +68,7 @@ fn reveal(m: State<Shared>, id: u64, open: bool) {
         // A program or script is never run from here: its folder is shown instead (Security 324).
         let risky = ["exe", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "vbe", "js", "jse", "wsf", "hta", "lnk", "reg", "cpl", "jar", "msix", "appx"];
         let runs = std::path::Path::new(&target).extension().map(|e| risky.contains(&e.to_string_lossy().to_ascii_lowercase().as_str())).unwrap_or(false);
-        if open && !runs { cmd.arg(&target); } else { cmd.arg(format!("/select,{target}")); }
+        if open && !runs { cmd.arg(&target); } else { cmd.raw_arg(format!("/select,\"{}\"", target.replace('"', ""))); }
         let _ = cmd.creation_flags(0x0800_0000).spawn();
     }
 }

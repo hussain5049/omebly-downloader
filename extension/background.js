@@ -8,11 +8,16 @@ const MAX_PER_TAB = 60;
 
 const key = (tabId) => `tab:${tabId}`;
 async function list(tabId) { const r = await chrome.storage.session.get(key(tabId)); return r[key(tabId)] ?? []; }
-async function remember(tabId, found) {
-  const all = await list(tabId);
-  if (all.some((x) => x.src === found.src)) return;
-  all.push(found);
-  await chrome.storage.session.set({ [key(tabId)]: all.slice(-MAX_PER_TAB) });
+// One write at a time: streams found at the same moment (a main list and its quality lists) were overwriting each other.
+let writing = Promise.resolve();
+function remember(tabId, found) {
+  writing = writing.then(async () => {
+    const all = await list(tabId);
+    if (all.some((x) => x.src === found.src)) return;
+    all.push(found);
+    await chrome.storage.session.set({ [key(tabId)]: all.slice(-MAX_PER_TAB) });
+  }).catch(() => {});
+  return writing;
 }
 
 chrome.webRequest.onHeadersReceived.addListener((d) => {

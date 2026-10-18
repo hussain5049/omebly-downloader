@@ -1,6 +1,6 @@
 [package]
 name = "omebly-downloader"
-version = "0.2.3"
+version = "0.2.4"
 description = "Omebly Downloader: downloads videos, audio, images and files at full speed"
 edition = "2021"
 license = "GPL-3.0-or-later"

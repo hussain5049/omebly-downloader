@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Tutedude | Lectures</title>
+<style>body{font:15px system-ui;margin:24px}video{width:520px;background:#111;border-radius:12px;margin:6px}</style></head>
+<body>
+<h1>Assets Required for Website Development</h1>
+<video id="promo" muted playsinline></video>
+<video id="lecture" muted playsinline controls></video>
+<script>
+// Like a course site: a short video that starts by itself, and the lecture's own player. Each plays from pieces.
+function player(id, master, quality, seconds) {
+  const v = document.getElementById(id), ms = new MediaSource();
+  v.src = URL.createObjectURL(ms);
+  ms.addEventListener('sourceopen', async () => {
+    try { ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'); ms.duration = seconds; } catch (e) { /* the pieces are what matter */ }
+    await fetch(master);
+    const list = await (await fetch(quality)).text();
+    const dir = quality.slice(0, quality.lastIndexOf('/') + 1);
+    for (const line of list.split('\n')) if (line && !line.startsWith('#')) await fetch(dir + line);
+  });
+}
+player('promo', '/media/promo/master.m3u8', '/media/promo/v0.m3u8', 3);
+player('lecture', '/media/abr/master.m3u8', '/media/abr/v0.m3u8', 6);
+</script>
+</body>
+</html>

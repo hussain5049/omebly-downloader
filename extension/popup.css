@@ -25,14 +25,14 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 
 .selall { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .ck { width: 18px; height: 18px; border-radius: 5px; flex: none; border: 1.5px solid #3A4A44; display: grid; place-items: center; }
-.ck[aria-checked="true"] { background: var(--mint); border-color: var(--mint); }
-.ck[aria-checked="true"]::after { content: ''; width: 9px; height: 5px; border: solid var(--mintText); border-width: 0 0 2.4px 2.4px; transform: translateY(-1px) rotate(-45deg); }
+.ck[aria-checked="true"], .ck[data-mark="true"] { background: var(--mint); border-color: var(--mint); }
+.ck[aria-checked="true"]::after, .ck[data-mark="true"]::after { content: ''; width: 9px; height: 5px; border: solid var(--mintText); border-width: 0 0 2.4px 2.4px; transform: translateY(-1px) rotate(-45deg); }
 .ck[aria-checked="mixed"] { border-color: var(--mint); }
 .ck[aria-checked="mixed"]::after { content: ''; width: 8px; height: 2px; background: var(--mint); }
 
 main { flex: 1; overflow-y: auto; padding: 6px; min-height: 120px; }
 main::-webkit-scrollbar { width: 8px; } main::-webkit-scrollbar-thumb { background: var(--ink3); border-radius: 4px; }
-.row { display: flex; gap: 10px; padding: 10px; border-radius: 12px; align-items: flex-start; width: 100%; text-align: left; }
+.row { cursor: pointer; display: flex; gap: 10px; padding: 10px; border-radius: 12px; align-items: flex-start; width: 100%; text-align: left; }
 .row:hover { background: #101D18; }
 .row.on { background: var(--ink2); }
 .row .ck { margin-top: 12px; }
@@ -69,3 +69,7 @@ main::-webkit-scrollbar { width: 8px; } main::-webkit-scrollbar-thumb { backgrou
 .go { height: 48px; border-radius: 13px; background: var(--mint); color: var(--mintText); font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .go svg { width: 18px; height: 18px; stroke-width: 2.6; }
 .go:disabled { background: var(--ink3); color: #5E746B; cursor: default; }
+
+.qsel { font: 600 11px 'Segoe UI', sans-serif; padding: 2px 6px; border-radius: 999px; border: 0; background: var(--ink3); color: var(--soft); cursor: pointer; }
+.qsel:focus-visible { outline: 2px solid var(--mint); }
+.row:focus-visible { outline: 2px solid var(--mint); outline-offset: -2px; }

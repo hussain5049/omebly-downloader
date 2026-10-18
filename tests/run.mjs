@@ -39,7 +39,7 @@ async function panelFor(url, waitMs = 2500, scrollY = 0) {
   const tabId = await panel.evaluate(async (u) => (await chrome.tabs.query({})).find((t) => t.url === u || t.url?.startsWith(u))?.id, page.url());
   await panel.setViewportSize({ width: 420, height: 600 });
   panel.on('pageerror', (e) => console.log('PANEL ERROR', e.message)); panel.on('console', (m) => { if (m.type() === 'error') console.log('PANEL CONSOLE', m.text()); });
-  await panel.goto(`chrome-extension://${id}/popup.html?tab=${tabId}`);
+  await panel.goto(`chrome-extension://${id}/popup.html?tab=${tabId}&noapp=1`);
   await panel.waitForFunction(() => document.getElementById('h-title').textContent !== 'Looking at this page…', null, { timeout: 8000 }).catch(() => {});
   await panel.waitForTimeout(300);
   return { page, panel };
@@ -48,7 +48,7 @@ const read = (panel) => panel.evaluate(() => ({
   title: document.getElementById('h-title').textContent,
   tabs: [...document.querySelectorAll('#tabs button')].map((b) => b.textContent),
   chips: [...document.querySelectorAll('#chips button')].map((b) => `${b.textContent}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}`),
-  rows: [...document.querySelectorAll('.row, .tile')].map((r) => ({ name: r.querySelector('.name')?.textContent || r.getAttribute('aria-label'), pills: [...r.querySelectorAll('.pill')].map((p) => p.textContent), locked: !!r.querySelector('.locked'), on: r.querySelector('.ck')?.getAttribute('aria-checked') })),
+  rows: [...document.querySelectorAll('.row, .tile')].map((r) => ({ name: r.querySelector('.name')?.textContent || r.getAttribute('aria-label'), pills: [...r.querySelectorAll('.pill')].map((p) => p.textContent), qualities: [...r.querySelectorAll('.qsel option')].map((o) => o.textContent), locked: !!r.querySelector('.locked'), on: r.getAttribute('aria-checked') || r.querySelector('.ck')?.getAttribute('aria-checked') })),
   note: document.getElementById('note').hidden ? '' : document.getElementById('note').textContent,
   go: document.getElementById('go-label').textContent, goOff: document.getElementById('go').disabled,
 }));
@@ -74,9 +74,23 @@ const shot = (panel, name) => panel.screenshot({ path: join(OUT, `${name}.png`) 
 {
   const { page, panel } = await panelFor(`${SITE}/stream.html`, 3000);
   const s = await read(panel); await shot(panel, '2-stream');
-  ok('stream: the stream is found on the network, and its main list and two quality lists show as one 720p video', s.rows.length === 1 && s.rows[0].pills.includes('720p'), JSON.stringify(s.rows));
+  ok('stream: the stream is found on the network, and its main list and two quality lists show as one video', s.rows.length === 1, JSON.stringify(s.rows));
+  ok('stream: every quality it offers can be chosen (720p, 360p), best first', JSON.stringify(s.rows[0]?.qualities) === JSON.stringify(['720p', '360p', 'Audio only']), JSON.stringify(s.rows[0]?.qualities));
   ok('stream: it is named from the page heading, not the tab title', s.rows[0]?.name === 'Knife skills for beginners', JSON.stringify(s.rows));
   ok('stream: it is marked as needing the app, with a note', s.rows.some((r) => r.pills.includes('Uses the app')) && /needs? the Omebly Downloader app/.test(s.note), JSON.stringify(s));
+  await page.close(); await panel.close();
+}
+// 2b. A course page with two videos: one that starts by itself and the lecture. Each gets its own name.
+{
+  const { page, panel } = await panelFor(`${SITE}/two-videos.html`, 3500);
+  const s = await read(panel); await shot(panel, '2b-two-videos');
+  ok('two videos: both are listed', s.rows.length === 2, JSON.stringify(s.rows));
+  ok('two videos: told apart by name (one with its length)', new Set(s.rows.map((r) => r.name)).size === 2 && s.rows.every((r) => r.name.startsWith('Assets Required for Website Development')) && s.rows.some((r) => /\(0:0[36]\)$/.test(r.name)), JSON.stringify(s.rows.map((r) => r.name)));
+  ok('two videos: each shows its own qualities', s.rows.some((r) => r.qualities[0] === '1080p') && s.rows.some((r) => r.qualities[0] === '720p'), JSON.stringify(s.rows));
+  // The chosen quality goes to the app.
+  await panel.selectOption('select.qsel >> nth=0', { index: 1 });
+  const sent = await panel.evaluate(async () => { const { state, render } = window.__panel; state.app = true; let got = null; chrome.runtime.sendNativeMessage = async (h, m) => { got = m; return { ok: true }; }; chrome.cookies.getAll = async () => []; render(); document.getElementById('go').click(); await new Promise((r) => setTimeout(r, 300)); return got; }).catch((e) => ({ error: String(e) }));
+  ok('two videos: the chosen quality is what is sent', sent?.items?.some((i) => i.height === 360 || i.height === 720), JSON.stringify(sent?.items || sent));
   await page.close(); await panel.close();
 }
 // 3. Photos, audio and files.

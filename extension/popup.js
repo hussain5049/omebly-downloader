@@ -20,10 +20,14 @@ const quality = (it) => it.height ? (it.height >= 2000 ? '4K' : `${it.height}p`)
 const cssUrl = (u) => (/^https?:\/\//i.test(u || '') ? `url("${u.replace(/["'()\\\s<>;]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())}")` : 'none');
 const safe = (s) => (s || 'Download').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Download';
 
-const state = { tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {}, app: false };
+// Qualities offered for a video site page (the app picks the nearest one the site has).
+const SITE_QUALITIES = [2160, 1440, 1080, 720, 480, 360];
+const state = { pick: {}, tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {}, app: false };
 const HOST = 'com.omebly.downloader';
 // Is the Omebly Downloader app installed? (It answers through the browser's link to programs.)
-const appReady = chrome.runtime.sendNativeMessage(HOST, { type: 'hello' }).then((r) => !!r?.ok).catch(() => false);
+// Tests open the panel with ?noapp=1, so they never reach a real Omebly Downloader on the computer.
+const TEST = new URLSearchParams(location.search).has('noapp');
+const appReady = TEST ? Promise.resolve(false) : chrome.runtime.sendNativeMessage(HOST, { type: 'hello' }).then((r) => !!r?.ok).catch(() => false);
 
 async function load() {
   // For tests the panel can be opened as a page with ?tab=<id>; normally it is the current tab.
@@ -42,13 +46,21 @@ async function load() {
   let streams = await chrome.runtime.sendMessage({ type: 'streams', tabId: state.tab.id }).catch(() => []);
   streams = await groupStreams(streams || []);
   const pageStream = items.find((i) => i.stream && i.needsApp);
-  for (const s of streams || []) {
-    if (seen.has(s.kind + s.src)) continue;
-    seen.add(s.kind + s.src);
-    items.push({ kind: s.kind, src: s.src, title: pageStream?.title || top?.heading || state.page.title, inView: !!pageStream?.inView, playing: !!pageStream?.playing, needsApp: s.stream, stream: s.stream, format: s.format, size: s.master ? 0 : s.size, height: s.height || 0, ext: s.stream ? (s.format === 'DASH' ? 'mpd' : 'm3u8') : '' , protected: items.some((i) => i.protected && (i.kind === 'video' || i.kind === 'audio')), sniffed: true });
-  }
+  const players = items.filter((i) => i.stream && i.needsApp && i.duration);
+  // Each stream goes with the player of the same length (the lecture you play, or a video that started by itself).
+  // With one stream it takes the page's name; with several, the one playing keeps it and the others add their length,
+  // so "Lecture" and "Lecture (2:45)" can be told apart.
+  const fresh = (streams || []).filter((x) => !seen.has(x.kind + x.src));
+  const matched = fresh.map((x) => ({ s: x, player: x.duration ? players.find((p) => Math.abs(p.duration - x.duration) < 3) : (players.length === 1 ? players[0] : null) }));
+  matched.sort((a, b) => (+!!b.player?.playing - +!!a.player?.playing));
+  matched.forEach(({ s: x, player }, i) => {
+    seen.add(x.kind + x.src);
+    const base = player?.title || pageStream?.title || top?.heading || state.page.title;
+    const title = fresh.length === 1 || (i === 0 && player) ? base : `${base} (${fmtTime(x.duration) || 'another video'})`;
+    items.push({ kind: x.kind, src: x.src, title, inView: !!(player || pageStream)?.inView, playing: !!player?.playing, duration: x.duration || player?.duration || 0, qualities: x.qualities || [], needsApp: x.stream, stream: x.stream, format: x.format, size: x.master ? 0 : x.size, height: x.height || 0, ext: x.stream ? (x.format === 'DASH' ? 'mpd' : 'm3u8') : '', protected: items.some((it) => it.protected && (it.kind === 'video' || it.kind === 'audio')), sniffed: true });
+  });
   // A player whose pieces were found on the network does not need the page-address entry as well.
-  if (pageStream && (streams || []).some((s) => s.stream)) items.splice(items.indexOf(pageStream), 1);
+  if (pageStream && (streams || []).some((s) => s.stream)) for (const p of items.filter((i) => i.stream && i.needsApp && !i.sniffed)) items.splice(items.indexOf(p), 1);
   // Playing first, then what is on screen, then the rest in page order.
   // order = place on the page (frames after the page itself); the list shows playing and on-screen ones first.
   items.forEach((it, i) => { it.order = (it.pos ?? 100000) + i / 1e6; });
@@ -74,21 +86,29 @@ function applyInfo(info) {
 
 // One video often comes as several HLS lists: a main list naming one list per quality (and per audio language).
 // The main list is kept as the video; the lists it names are folded into it (shown as its qualities).
+// Each stream's list is read once: a main list gives every quality it offers (1080p, 720p, …) and the lists it
+// names (folded into it); a quality list gives the video's length, so each stream can be matched to its player.
 async function groupStreams(streams) {
   const hls = streams.filter((s) => s.stream && s.format === 'HLS');
-  if (hls.length < 2) return streams;
   const folded = new Set();
+  const lengthOf = (text) => text.split(/\r?\n/).reduce((t, l) => { const m = /^#EXTINF:([\d.]+)/.exec(l); return m ? t + +m[1] : t; }, 0);
+  const get = async (u) => (await fetch(u, { credentials: 'omit' })).text();
   await Promise.all(hls.slice(0, 12).map(async (s) => {
     try {
-      const text = await (await fetch(s.src, { credentials: 'omit' })).text();
-      if (!/#EXT-X-STREAM-INF/i.test(text)) return;
-      const heights = [];
+      const text = await get(s.src);
+      if (!/#EXT-X-STREAM-INF/i.test(text)) { s.duration = lengthOf(text); return; }
+      const variants = [];
       text.split(/\r?\n/).forEach((line, i, all) => {
-        const m = /RESOLUTION=\d+x(\d+)/i.exec(line); if (m) heights.push(+m[1]);
         const uri = /URI="([^"]+)"/i.exec(line)?.[1] || (/^#EXT-X-STREAM-INF/i.test(all[i - 1] || '') && line && !line.startsWith('#') ? line.trim() : '');
         if (uri) { try { folded.add(new URL(uri, s.src).href); } catch { /* not an address */ } }
+        const m = /^#EXT-X-STREAM-INF.*RESOLUTION=\d+x(\d+)/i.exec(line);
+        if (m && all[i + 1]) variants.push({ height: +m[1], uri: all[i + 1].trim() });
       });
-      s.master = true; if (heights.length) s.height = Math.max(...heights);
+      s.master = true;
+      s.qualities = [...new Set(variants.map((v) => v.height))].sort((a, b) => b - a);
+      if (s.qualities.length) s.height = s.qualities[0];
+      const best = variants.sort((a, b) => b.height - a.height)[0];
+      if (best) s.duration = lengthOf(await get(new URL(best.uri, s.src).href));
     } catch { /* the stream answers only the site's own player: kept as it is */ }
   }));
   return streams.filter((s) => !folded.has(s.src));
@@ -134,7 +154,11 @@ function render(mode) {
       if (it.protected) return `<div class="row"><span class="lock">${ICON.lock}</span><div class="thumb" style="opacity:.6"></div><div class="info"><div class="name" style="color:var(--muted)">${esc(it.title)}</div><div class="locked">Protected by the site, can't be saved</div></div></div>`;
       const on = state.chosen.has(it.src), size = fmtSize(sizeOf(it)), q = quality(it);
       const thumb = it.kind === 'file' ? `<span class="badge ${esc(it.ext)}">${esc(it.ext || 'file')}</span>` : `<div class="thumb" style="${it.thumb ? `background-image:${esc(cssUrl(it.thumb))}` : ''}">${it.kind === 'audio' && !it.thumb ? `<span style="left:26px;bottom:12px">♪</span>` : ''}<span>${fmtTime(it.duration)}</span></div>`;
-      return `<button class="row${on ? ' on' : ''}" data-src="${esc(it.src)}"><span class="ck" role="checkbox" aria-checked="${on}"></span>${thumb}<div class="info"><div class="name">${esc(it.title)}</div><div class="meta">${it.playing ? '<span class="pill play">Playing</span>' : ''}${q ? `<span class="pill">${esc(q)}</span>` : ''}${it.needsApp ? '<span class="pill app">Uses the app</span>' : ''}${size ? `<span class="size">${size}</span>` : ''}</div></div></button>`;
+      // A choice of quality when there is one: every quality the stream offers, or the usual ones for a video site.
+      const qs = it.qualities?.length > 1 ? it.qualities : (it.kind === 'video' && it.needsApp && !it.stream) ? SITE_QUALITIES : [];
+      const chosenQ = state.pick[it.src] || it.height || qs[0];
+      const qual = qs.length ? `<select class="qsel" data-q="${esc(it.src)}" aria-label="Quality">${qs.map((h) => `<option value="${h}" ${h === chosenQ ? 'selected' : ''}>${h >= 2160 ? '4K' : h + 'p'}</option>`).join('')}${it.kind === 'video' && it.needsApp ? '<option value="0">Audio only</option>' : ''}</select>` : (q ? `<span class="pill">${esc(q)}</span>` : '');
+      return `<div class="row${on ? ' on' : ''}" data-src="${esc(it.src)}" role="checkbox" aria-checked="${on}" tabindex="0"><span class="ck" aria-hidden="true" data-mark="${on}"></span>${thumb}<div class="info"><div class="name">${esc(it.title)}</div><div class="meta">${it.playing ? '<span class="pill play">Playing</span>' : ''}${qual}${it.needsApp ? '<span class="pill app">Uses the app</span>' : ''}${size ? `<span class="size">${size}</span>` : ''}</div></div></div>`;
     }).join('');
   }
   // Footer: where it goes, and the button.
@@ -149,8 +173,11 @@ function render(mode) {
   $('go-label').textContent = direct.length ? `Download ${direct.length} ${direct.length === 1 ? one : many}${total ? ` · ${fmtSize(total)}` : ''}` : viaApp ? 'Needs the Omebly Downloader app' : 'Choose something to download';
 }
 
+document.addEventListener('change', (e) => { const s = e.target.closest('select[data-q]'); if (s) state.pick[s.dataset.q] = +s.value; });
+document.addEventListener('keydown', (e) => { const r = e.target.closest?.('.row[data-src]'); if (r && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); r.click(); } });
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('button'); if (!t) return;
+  if (e.target.closest('select')) return; // choosing a quality is not ticking the row
+  const t = e.target.closest('button, .row[data-src]'); if (!t) return;
   if (t.dataset.kind) {
     // The first time a tab is opened, everything in it is chosen (as when the panel opens).
     state.kind = t.dataset.kind;
@@ -174,7 +201,7 @@ async function download() {
     const cookies = [];
     for (const url of hosts) for (const c of await chrome.cookies.getAll({ url }).catch(() => [])) cookies.push({ domain: c.domain, path: c.path, name: c.name, value: c.value, secure: c.secure, expires: c.expirationDate || 0, hostOnly: c.hostOnly });
     const msg = { type: 'download', page: { url: state.tab.url, title: state.page.title }, headers: { referer: state.tab.url, userAgent: navigator.userAgent }, cookies,
-      items: sel.map((i) => ({ url: i.src, title: i.title, kind: i.kind, needsApp: !!i.needsApp, ext: i.ext || '', height: i.height || 0 })) };
+      items: sel.map((i) => { const h = state.pick[i.src] ?? i.height ?? 0; return { url: i.src, title: i.title, kind: h === 0 && state.pick[i.src] === 0 ? 'audio' : i.kind, needsApp: !!i.needsApp, ext: i.ext || '', height: h || 0 }; }) };
     const r = await chrome.runtime.sendNativeMessage(HOST, msg).catch((e) => ({ ok: false, error: String(e?.message || e) }));
     $('go-label').textContent = r?.ok ? `Sent ${sel.length} ${noun(sel.length)} to Omebly Downloader` : 'Could not reach the app. Open Omebly Downloader and try again.';
     $('go').disabled = !!r?.ok;
@@ -198,4 +225,5 @@ async function download() {
 }
 
 appReady.then((ok) => { state.app = ok; if (state.items.length) render(); });
+if (TEST) window.__panel = { state, render };
 void load();
