@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Omebly Downloader</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header class="top">
+  <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg></div>
+  <div class="head"><div id="h-title">Looking at this page…</div><div id="h-sub" class="sub"></div></div>
+</header>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+<div class="chips" id="chips"></div>
+<div class="selall" id="selall" hidden><button class="ck" id="ck-all" role="checkbox" aria-checked="false" aria-label="Choose all"></button><span id="sel-count"></span></div>
+<main id="list" aria-live="polite"></main>
+<footer class="foot" id="foot" hidden>
+  <div class="where"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span id="where"></span></div>
+  <div class="note" id="note" hidden></div>
+  <button class="go" id="go" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span id="go-label">Download</span></button>
+</footer>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

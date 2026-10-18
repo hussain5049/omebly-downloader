@@ -1,0 +1,16 @@
+{
+  "name": "omebly-downloader",
+  "private": true,
+  "description": "Omebly Downloader: see every video, audio, image and file on a page and download what you tick. Free and open source (GPL-3.0).",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "icons": "node tools/make-icons.mjs",
+    "test-site": "node test-site/serve.mjs",
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0",
+    "pngjs": "7.0.0"
+  }
+}

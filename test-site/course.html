@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>React Basics · Lesson 3</title>
+<style>body{font:15px system-ui;margin:0;background:#f3f5f4;color:#1d2422}main{display:flex;gap:24px;padding:24px}.player{flex:1}video{width:100%;border-radius:12px;background:#1b2330}aside{width:300px}aside a,aside div{display:block;padding:10px 12px;margin:6px 0;border-radius:10px;background:#fff;color:#1d2422;text-decoration:none}.notes{height:1400px}</style></head>
+<body>
+<main>
+  <section class="player">
+    <video id="v" src="/media/lesson-3.mp4" autoplay muted loop playsinline controls title="Lesson 3: Components and props"></video>
+    <h1>Lesson 3: Components and props</h1>
+    <p>React Basics · 14 min</p>
+  </section>
+  <aside>
+    <h3>Course lessons</h3>
+    <a href="/media/lesson-1.mp4">1. Welcome and setup</a>
+    <a href="/media/lesson-2.mp4">2. Your first component</a>
+    <a href="/media/lesson-3.mp4">3. Components and props</a>
+    <a href="/media/lesson-4.mp4">4. State and events</a>
+    <a href="/media/lesson-5.mp4">5. Lists and keys</a>
+    <div>7. Final project (Premium)<video id="locked" muted width="260" title="Final project"></video></div>
+  </aside>
+</main>
+<div class="notes"></div>
+<p>Further down the page: <a href="/media/lesson-6.mp4">6. Forms (bonus lesson)</a></p>
+<script>
+// Lesson 7 is locked with copy protection (ClearKey media keys stand in for real DRM here).
+navigator.requestMediaKeySystemAccess('org.w3.clearkey', [{ initDataTypes: ['cenc'], videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }] }])
+  .then((a) => a.createMediaKeys()).then((k) => document.getElementById('locked').setMediaKeys(k)).then(() => { document.getElementById('locked').src = '/media/locked-final-project.mp4'; });
+</script>
+</body>
+</html>
