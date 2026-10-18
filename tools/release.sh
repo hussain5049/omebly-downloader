@@ -13,6 +13,9 @@ BASE="https://api.omebly.com/downloads/downloader"
 V=$(node -p "require('./app/src-tauri/tauri.conf.json').version")
 [ "$(node -p "require('./extension/manifest.json').version")" = "$V" ] || { echo "extension version is not $V"; exit 1; }
 
+PIN=$(grep -v "^#" tools/yt-dlp.pin | sed -n 2p | tr -d "\r")
+[ "$(sha256sum app/src-tauri/tools/yt-dlp.exe | cut -d" " -f1)" = "$PIN" ] || { echo "yt-dlp.exe is not the pinned one (tools/yt-dlp.pin)"; exit 1; }
+
 export PATH="$HOME/.cargo/bin:$PATH" TAURI_SIGNING_PRIVATE_KEY="$KEY" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 (cd app && npx tauri build)
 OUT="app/src-tauri/target/release/bundle/nsis/Omebly Downloader_${V}_x64-setup.exe"
