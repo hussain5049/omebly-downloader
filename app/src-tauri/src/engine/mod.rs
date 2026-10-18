@@ -63,7 +63,7 @@ pub struct Incoming {
     #[serde(default)] pub cookies: Vec<Cookie>,
 }
 #[derive(Debug, Default, Deserialize)]
-pub struct PageInfo { #[serde(default)] #[allow(dead_code)] pub url: String, #[serde(default)] pub title: String }
+pub struct PageInfo { #[serde(default)] pub url: String, #[serde(default)] pub title: String }
 #[derive(Debug, Deserialize)]
 pub struct IncomingItem {
     pub url: String,
@@ -145,7 +145,10 @@ impl Manager {
             if !(it.url.starts_with("http://") || it.url.starts_with("https://")) { continue; }
             // The same link sent twice (Download pressed again) is not downloaded twice while it is still going.
             if self.jobs.lock().unwrap().iter().any(|j| j.url == it.url && matches!(j.state, State::Waiting | State::Downloading | State::Paused)) { continue; }
-            let site = url::Url::parse(&it.url).ok().and_then(|u| u.host_str().map(|h| h.trim_start_matches("www.").to_string())).unwrap_or_default();
+            let host_of = |u: &str| url::Url::parse(u).ok().and_then(|u| u.host_str().map(|h| h.trim_start_matches("www.").to_string())).unwrap_or_default();
+            let media_host = host_of(&it.url);
+            // Shown as the page's site (upskill.tutedude.com), not the video server's (…cloudfront.net).
+            let site = Some(host_of(&inc.page.url)).filter(|h| !h.is_empty()).unwrap_or_else(|| media_host.clone());
             let title = if it.title.is_empty() { "Download".to_string() } else { it.title.clone() };
             let folder = if it.folder.is_empty() { base.join(&group) } else { base.join(safe_name(&it.folder)) };
             let numbered = media > 1 && (it.kind == "video" || it.kind == "audio");
@@ -158,7 +161,7 @@ impl Manager {
             let ext = if !ext.is_empty() && ext.len() <= 8 && ext.chars().all(|c| c.is_ascii_alphanumeric()) { ext } else if ext.is_empty() { String::new() } else { "bin".into() };
             let how = if it.needs_app || ext == "m3u8" || ext == "mpd" { "site" } else { "file" };
             let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-            let cookies = inc.cookies.iter().filter(|c| cookie_matches(c, &site)).cloned().collect();
+            let cookies = inc.cookies.iter().filter(|c| cookie_matches(c, &media_host)).cloned().collect();
             self.jobs.lock().unwrap().push(Job {
                 id, how: how.into(), kind: if it.kind.is_empty() { "file".into() } else { it.kind.clone() }, url: it.url.clone(), title, group: group.clone(), site,
                 folder: folder.to_string_lossy().to_string(), name, ext, height: it.height, languages: it.languages, subtitles: it.subtitles,
