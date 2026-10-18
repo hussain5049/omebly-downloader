@@ -91,7 +91,6 @@ if (page && b) {
 // Speed: the same file over 1 connection and over 16 (the test site gives each connection about 2.5 MB/s).
 if (page) {
   const timeIt = async (n) => {
-    await page.evaluate((c) => window.__TAURI__.core.invoke('save_settings', { s: { folder: '', connections: c, at_once: 3 } }).catch(() => {}), n);
     const s = await page.evaluate(() => window.__TAURI__.core.invoke('settings'));
     await page.evaluate((x) => window.__TAURI__.core.invoke('save_settings', { s: { ...x } }), { ...s, connections: n });
     const t0 = Date.now();

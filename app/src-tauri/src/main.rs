@@ -44,7 +44,11 @@ fn add_links(m: State<Shared>, text: String) -> usize {
 fn settings(m: State<Shared>) -> Settings { m.settings.lock().unwrap().clone() }
 #[tauri::command]
 fn save_settings(m: State<Shared>, s: Settings) {
-    *m.settings.lock().unwrap() = Settings { folder: s.folder, connections: s.connections.clamp(1, 32), at_once: s.at_once.clamp(1, 10) };
+    // An empty or relative folder keeps the one already set (never a folder next to the app).
+    let mut cur = m.settings.lock().unwrap();
+    let folder = if std::path::Path::new(s.folder.trim()).is_absolute() { s.folder.trim().to_string() } else { cur.folder.clone() };
+    *cur = Settings { folder, connections: s.connections.clamp(1, 32), at_once: s.at_once.clamp(1, 10) };
+    drop(cur);
     m.save();
     m.schedule();
 }
