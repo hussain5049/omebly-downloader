@@ -62,6 +62,14 @@ if (st?.saved && existsSync(st.saved)) {
   ok('stream: the 720p video and its sound are in it', /video,720/.test(probe.replace(/\r/g, '')) && /audio/.test(probe), probe);
 }
 
+let zone = ''; try { zone = readFileSync(join(downloads, 'Omebly', 'React Basics', lessons[0]) + ':Zone.Identifier', 'utf8'); } catch { /* none */ }
+ok('safety: a finished file is marked as from the internet (Mark of the Web)', /ZoneId=3/.test(zone) && /HostUrl=http:\/\/127\.0\.0\.1:4430\/media\/lesson-1\.mp4/.test(zone), zone);
+// A strange extension cannot lead the file out of its folder.
+await send({ type: 'download', page: { title: 'Odd' }, items: [{ url: `${SITE}/media/science-notes.pdf`, title: 'notes', kind: 'file', ext: 'x\\..\\..\\..\\escaped' }] });
+j = await waitFor((x) => ['done', 'failed'].includes(x.find((y) => y.title === 'notes')?.state), 30000);
+const odd = j.find((y) => y.title === 'notes');
+ok('safety: an odd extension becomes .bin inside the page folder', odd?.saved?.startsWith(join(downloads, 'Omebly', 'Odd')) && odd.saved.endsWith('notes.bin') && !existsSync(join(downloads, 'escaped')), JSON.stringify(odd && { state: odd.state, saved: odd.saved }));
+
 // Locked stream: refused, never downloaded.
 writeFileSync(join(ROOT, 'test-site/media/abr/locked.m3u8'), '#EXTM3U\n#EXT-X-VERSION:5\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://key",KEYFORMAT="com.apple.streamingkeydelivery"\n#EXTINF:2,\nv0_000.ts\n#EXT-X-ENDLIST\n');
 await send({ type: 'download', page: { title: 'Locked' }, items: [{ url: `${SITE}/media/abr/locked.m3u8`, title: 'Locked lesson', kind: 'video', needsApp: true, ext: 'm3u8' }] });

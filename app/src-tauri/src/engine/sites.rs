@@ -64,7 +64,7 @@ pub async fn check_stream(client: &reqwest::Client, url: &str, headers: &[(Strin
     for (k, v) in headers {
         req = req.header(k.as_str(), v.as_str());
     }
-    let text = req.send().await.map_err(|e| format!("Could not reach the stream: {e}"))?.text().await.map_err(|e| e.to_string())?;
+    let text = read_capped(req.send().await.map_err(|e| format!("Could not reach the stream: {e}"))?).await?;
     if is_protected_manifest(&text) {
         return Err("Protected: this video is locked with copy protection, so it can't be saved".into());
     }
@@ -76,17 +76,27 @@ pub async fn check_stream(client: &reqwest::Client, url: &str, headers: &[(Strin
                 for (k, v) in headers {
                     r = r.header(k.as_str(), v.as_str());
                 }
-                if let Ok(res) = r.send().await {
-                    if let Ok(t) = res.text().await {
-                        if is_protected_manifest(&t) {
-                            return Err("Protected: this video is locked with copy protection, so it can't be saved".into());
-                        }
-                    }
+                // A quality list that cannot be read is not handed over (it might be the locked one).
+                let res = r.send().await.map_err(|e| format!("Could not reach the stream: {e}"))?;
+                if is_protected_manifest(&read_capped(res).await?) {
+                    return Err("Protected: this video is locked with copy protection, so it can't be saved".into());
                 }
             }
         }
     }
     Ok(())
+}
+
+/// A stream's list, at most 4 MB (a real list is far smaller).
+async fn read_capped(res: reqwest::Response) -> Result<String, String> {
+    use futures_util::StreamExt;
+    let mut body = Vec::new();
+    let mut s = res.bytes_stream();
+    while let Some(piece) = s.next().await {
+        body.extend_from_slice(&piece.map_err(|e| e.to_string())?);
+        if body.len() > 4 * 1024 * 1024 { return Err("The stream's list is too large to check".into()); }
+    }
+    Ok(String::from_utf8_lossy(&body).to_string())
 }
 
 fn format_for(req: &SiteRequest) -> String {
@@ -116,7 +126,8 @@ pub fn download(
     let template = req.folder.join(format!("{}.%(ext)s", req.name.replace('%', "%%")));
     let mut cmd = Command::new(ytdlp);
     cmd.arg(&req.url)
-        .args(["--newline", "--no-playlist", "--no-mtime", "--no-colors", "--continue"])
+        // Only our own settings: no config files or plugins from elsewhere on the computer (Security 324).
+        .args(["--ignore-config", "--no-plugin-dirs", "--newline", "--no-playlist", "--no-mtime", "--no-colors", "--continue"])
         .args(["-N", &req.connections.clamp(1, 32).to_string()])
         .args(["--progress-template", "download:OMEBLY%(progress)j"])
         .args(["--print", "after_move:OMEBLYFILE%(filepath)s"])

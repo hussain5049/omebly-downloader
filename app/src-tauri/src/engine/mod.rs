@@ -85,8 +85,10 @@ pub fn safe_name(s: &str) -> String {
     let cleaned: String = s.chars().map(|c| if "\\/:*?\"<>|".contains(c) || c.is_control() { ' ' } else { c }).collect();
     let words = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut t: String = words.trim_matches(|c: char| c == '.' || c == ' ').chars().take(120).collect();
-    let reserved = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "LPT1", "LPT2", "LPT3"];
-    if t.is_empty() || reserved.contains(&t.to_ascii_uppercase().as_str()) { t = format!("Download {t}").trim().to_string(); }
+    let up = t.to_ascii_uppercase();
+    let stem = up.split('.').next().unwrap_or("");
+    let reserved = ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"].contains(&stem) || ((stem.starts_with("COM") || stem.starts_with("LPT")) && stem.len() == 4 && stem.as_bytes()[3].is_ascii_digit());
+    if t.is_empty() || reserved { t = format!("Download {t}").trim().to_string(); }
     t
 }
 
@@ -147,7 +149,9 @@ impl Manager {
             let numbered = media > 1 && (it.kind == "video" || it.kind == "audio");
             let plain = strip_number(&title);
             let name = if !it.name.is_empty() { safe_name(&it.name) } else if numbered { safe_name(&format!("{:02} {}", n + 1, plain)) } else { safe_name(&title) };
+            // Only a plain extension (letters and digits); anything else becomes "bin" (Security 324).
             let ext = it.ext.trim_start_matches('.').to_ascii_lowercase();
+            let ext = if !ext.is_empty() && ext.len() <= 8 && ext.chars().all(|c| c.is_ascii_alphanumeric()) { ext } else if ext.is_empty() { String::new() } else { "bin".into() };
             let how = if it.needs_app || ext == "m3u8" || ext == "mpd" { "site" } else { "file" };
             let id = self.next_id.fetch_add(1, Ordering::Relaxed);
             let cookies = inc.cookies.iter().filter(|c| cookie_matches(c, &site)).cloned().collect();
@@ -195,14 +199,19 @@ impl Manager {
             let id = job.id;
             let result = if job.how == "file" {
                 let dest = PathBuf::from(&job.folder).join(format!("{}.{}", job.name, if job.ext.is_empty() { "bin" } else { &job.ext }));
-                let mut headers = job.headers.clone();
-                if let Some(c) = cookie_header(&job.cookies) { headers.push(("Cookie".into(), c)); }
-                let req = http::Request { url: job.url.clone(), dest, headers, connections };
-                let me = self.clone();
-                http::download(&self.client, &req, stop.clone(), move |p| me.update(id, |j| {
-                    j.done = p.done; j.total = p.total; j.speed = p.speed; j.parts = p.parts; j.connections = p.connections;
-                    j.eta = if p.speed > 1.0 && p.total > p.done { (p.total - p.done) as f64 / p.speed } else { 0.0 };
-                })).await
+                // The file must stay inside its folder whatever the name says.
+                if dest.parent() != Some(Path::new(&job.folder)) {
+                    Err("The file name was not allowed".to_string())
+                } else {
+                    let mut headers = job.headers.clone();
+                    if let Some(c) = cookie_header(&job.cookies) { headers.push(("Cookie".into(), c)); }
+                    let req = http::Request { url: job.url.clone(), dest, headers, connections };
+                    let me = self.clone();
+                    http::download(&self.client, &req, stop.clone(), move |p| me.update(id, |j| {
+                        j.done = p.done; j.total = p.total; j.speed = p.speed; j.parts = p.parts; j.connections = p.connections;
+                        j.eta = if p.speed > 1.0 && p.total > p.done { (p.total - p.done) as f64 / p.speed } else { 0.0 };
+                    })).await
+                }
             } else {
                 self.clone().run_site(&job, stop.clone(), connections).await
             };
@@ -210,7 +219,7 @@ impl Manager {
             self.update(id, |j| {
                 j.speed = 0.0; j.connections = 0;
                 match &result {
-                    Ok(path) => { j.state = State::Done; j.saved = path.to_string_lossy().to_string(); j.finished = now(); j.parts = vec![1.0; 16]; if j.total == 0 { j.total = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0); } j.done = j.total; }
+                    Ok(path) => { mark_from_internet(path, &j.url, &job.headers); j.state = State::Done; j.saved = path.to_string_lossy().to_string(); j.finished = now(); j.parts = vec![1.0; 16]; if j.total == 0 { j.total = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0); } j.done = j.total; }
                     Err(e) if e == "paused" => { if j.state == State::Downloading { j.state = State::Paused; } }
                     Err(e) if e.starts_with("Protected") => { j.state = State::Protected; j.error = e.clone(); }
                     Err(e) => { j.state = State::Failed; j.error = e.clone(); }
@@ -262,6 +271,17 @@ impl Manager {
         self.save();
     }
     pub fn snapshot(&self) -> Vec<Job> { self.jobs.lock().unwrap().clone() }
+}
+
+/// Marks a downloaded file as coming from the internet (the "Mark of the Web"), as browsers do, so Windows
+/// SmartScreen, Office's Protected View and macro blocking treat it with the same care (Security 324).
+fn mark_from_internet(path: &Path, url: &str, headers: &[(String, String)]) {
+    let referer = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("referer")).map(|(_, v)| v.as_str()).unwrap_or("");
+    let clean = |v: &str| v.replace(['\r', '\n'], "");
+    let body = format!("[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl={}\r\nHostUrl={}\r\n", clean(referer), clean(url));
+    let mut stream = path.as_os_str().to_owned();
+    stream.push(":Zone.Identifier");
+    let _ = std::fs::write(PathBuf::from(stream), body);
 }
 
 fn strip_number(t: &str) -> String {

@@ -65,7 +65,10 @@ fn reveal(m: State<Shared>, id: u64, open: bool) {
     {
         use std::os::windows::process::CommandExt;
         let mut cmd = std::process::Command::new("explorer");
-        if open { cmd.arg(&target); } else { cmd.arg(format!("/select,{target}")); }
+        // A program or script is never run from here: its folder is shown instead (Security 324).
+        let risky = ["exe", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "vbe", "js", "jse", "wsf", "hta", "lnk", "reg", "cpl", "jar", "msix", "appx"];
+        let runs = std::path::Path::new(&target).extension().map(|e| risky.contains(&e.to_string_lossy().to_ascii_lowercase().as_str())).unwrap_or(false);
+        if open && !runs { cmd.arg(&target); } else { cmd.arg(format!("/select,{target}")); }
         let _ = cmd.creation_flags(0x0800_0000).spawn();
     }
 }
@@ -96,6 +99,8 @@ fn main() {
         }))
         .setup(|app| {
             let downloads = std::env::var_os("OMEBLY_DOWNLOADS").map(std::path::PathBuf::from).or_else(|| app.path().download_dir().ok()).unwrap_or_else(bridge::data_dir);
+            // Leftovers from a crash: cookie files for downloads that ended are removed at start (Security 324).
+            if let Ok(dir) = std::fs::read_dir(bridge::data_dir()) { for e in dir.flatten() { if e.file_name().to_string_lossy().starts_with("cookies-") { let _ = std::fs::remove_file(e.path()); } } }
             let m = Manager::new(bridge::data_dir(), downloads);
             app.manage(m.clone());
             if std::env::var_os("OMEBLY_DATA_DIR").is_none() { bridge::register(); } // tests leave the browsers alone
