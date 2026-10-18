@@ -59,3 +59,10 @@ Free code signing provided by [SignPath.io](https://about.signpath.io/), certifi
   source are signed. The bundled yt-dlp is the official release, checked against the hash in `tools/yt-dlp.pin`.
 - **Privacy:** this program does not send any information to other networked systems unless the user asks for it,
   except the update check described in [PRIVACY.md](PRIVACY.md).
+
+## Bundled programs
+
+- **yt-dlp** (Unlicense), the official release pinned in `tools/yt-dlp.pin`.
+- **FFmpeg** (GPL-3.0), the yt-dlp/FFmpeg-Builds Windows build pinned in `tools/ffmpeg.pin`. Its licence is
+  installed next to it (`tools/FFMPEG-LICENSE.txt`); its source code is at https://github.com/FFmpeg/FFmpeg
+  (the commit named in the build) and the build scripts at https://github.com/yt-dlp/FFmpeg-Builds.

@@ -31,6 +31,17 @@ jobs:
           curl -fsSL -o app/src-tauri/tools/yt-dlp.exe "https://github.com/yt-dlp/yt-dlp/releases/download/$V/yt-dlp.exe"
           echo "$H  app/src-tauri/tools/yt-dlp.exe" | sha256sum -c -
 
+      - name: Bundled FFmpeg (the pinned yt-dlp build, checked by its hash)
+        shell: bash
+        run: |
+          pin() { grep -v '^#' tools/ffmpeg.pin | sed -n "${1}p" | tr -d '\r'; }
+          curl -fsSL -o ff.zip "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/$(pin 1)/$(pin 2).zip"
+          echo "$(pin 3)  ff.zip" | sha256sum -c -
+          unzip -q ff.zip
+          cp "$(pin 2)/bin/ffmpeg.exe" app/src-tauri/tools/ffmpeg.exe
+          cp "$(pin 2)/LICENSE.txt" app/src-tauri/tools/FFMPEG-LICENSE.txt
+          echo "$(pin 4)  app/src-tauri/tools/ffmpeg.exe" | sha256sum -c -
+
       - name: Build the installer
         working-directory: app
         shell: bash

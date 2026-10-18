@@ -15,6 +15,8 @@ V=$(node -p "require('./app/src-tauri/tauri.conf.json').version")
 
 PIN=$(grep -v "^#" tools/yt-dlp.pin | sed -n 2p | tr -d "\r")
 [ "$(sha256sum app/src-tauri/tools/yt-dlp.exe | cut -d" " -f1)" = "$PIN" ] || { echo "yt-dlp.exe is not the pinned one (tools/yt-dlp.pin)"; exit 1; }
+FF=$(grep -v "^#" tools/ffmpeg.pin | sed -n 4p | tr -d "\r")
+[ "$(sha256sum app/src-tauri/tools/ffmpeg.exe | cut -d" " -f1)" = "$FF" ] || { echo "ffmpeg.exe is not the pinned one (tools/ffmpeg.pin)"; exit 1; }
 
 export PATH="$HOME/.cargo/bin:$PATH" TAURI_SIGNING_PRIVATE_KEY="$KEY" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 (cd app && npx tauri build)
