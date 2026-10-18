@@ -27,7 +27,7 @@ npm test          # the extension on the local test pages (test-site/)
 REAL=1 npm test   # also opens a few real websites and saves what the panel shows in tests/out/
 ```
 
-`npm run test-site` serves the test pages on http://127.0.0.1:4430/ to try by hand.
+Make the test media once with `bash tools/make-test-media.sh` (needs FFmpeg). `npm run test-site` serves the test pages on http://127.0.0.1:4430/ to try by hand.
 
 ## How it works
 
