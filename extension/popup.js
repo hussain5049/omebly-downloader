@@ -15,6 +15,9 @@ const ICON = {
 const fmtSize = (n) => !n ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
 const fmtTime = (s) => { if (!s || !Number.isFinite(s)) return ''; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
 const quality = (it) => it.height ? (it.height >= 2000 ? '4K' : `${it.height}p`) : it.format || (it.needsApp ? '' : (it.ext || '').toUpperCase());
+// A picture's address for CSS: only web addresses, with every character that could end the CSS string encoded
+// (Security 323), so a page cannot change how the panel looks.
+const cssUrl = (u) => (/^https?:\/\//i.test(u || '') ? `url("${u.replace(/["'()\\s<>]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())}")` : 'none');
 const safe = (s) => (s || 'Download').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Download';
 
 const state = { tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {} };
@@ -38,7 +41,7 @@ async function load() {
   for (const s of streams || []) {
     if (seen.has(s.kind + s.src)) continue;
     seen.add(s.kind + s.src);
-    items.push({ kind: s.kind, src: s.src, title: pageStream?.title || state.page.title, inView: !!pageStream?.inView, playing: !!pageStream?.playing, needsApp: s.stream, stream: s.stream, format: s.format, size: s.size, ext: s.stream ? (s.format === 'DASH' ? 'mpd' : 'm3u8') : '' , protected: !!pageStream?.protected, sniffed: true });
+    items.push({ kind: s.kind, src: s.src, title: pageStream?.title || state.page.title, inView: !!pageStream?.inView, playing: !!pageStream?.playing, needsApp: s.stream, stream: s.stream, format: s.format, size: s.size, ext: s.stream ? (s.format === 'DASH' ? 'mpd' : 'm3u8') : '' , protected: items.some((i) => i.protected && (i.kind === 'video' || i.kind === 'audio')), sniffed: true });
   }
   // A player whose pieces were found on the network does not need the page-address entry as well.
   if (pageStream && (streams || []).some((s) => s.stream)) items.splice(items.indexOf(pageStream), 1);
@@ -51,7 +54,7 @@ async function load() {
   // page is dropped, so a wiki's "File:cat.webm" page is not offered as a video.
   const urls = items.filter((i) => !i.needsApp && !i.size && i.kind !== 'image').map((i) => i.src);
   if (urls.length) {
-    const asked = chrome.runtime.sendMessage({ type: 'sizes', urls }).catch(() => ({}));
+    const asked = chrome.runtime.sendMessage({ type: 'sizes', urls, tabId: state.tab.id }).catch(() => ({}));
     const info = await Promise.race([asked, new Promise((r) => setTimeout(() => r(null), 1500))]);
     if (info) applyInfo(info); else asked.then((i) => { applyInfo(i || {}); render(); });
   }
@@ -99,12 +102,12 @@ function render(mode) {
       ? `<div class="empty"><div class="ic">${ICON.search}</div><b>Press play, and it appears here</b><p>Some sites load their ${many} only when they start playing. Start it, then look again.</p><button class="again" id="again">Look again</button></div>`
       : `<div class="empty"><div class="ic">${ICON.search}</div><b>No ${many} on this page</b><p>${state.kind === 'image' && all.length ? 'Only small pictures here. Choose All sizes to see them.' : 'Try another tab above.'}</p></div>`;
   } else if (state.kind === 'image') {
-    main.innerHTML = `<div class="grid">${list.map((it) => `<button class="tile" data-src="${esc(it.src)}" style="background-image:url(&quot;${esc(it.thumb)}&quot;)" aria-label="${esc(it.title)}"><span class="ck" role="checkbox" aria-checked="${state.chosen.has(it.src)}"></span>${it.width ? `<span class="dim">${it.width}×${it.height || '?'}</span>` : ''}</button>`).join('')}</div>`;
+    main.innerHTML = `<div class="grid">${list.map((it) => `<button class="tile" data-src="${esc(it.src)}" style="background-image:${esc(cssUrl(it.thumb))}" aria-label="${esc(it.title)}"><span class="ck" role="checkbox" aria-checked="${state.chosen.has(it.src)}"></span>${it.width ? `<span class="dim">${it.width}×${it.height || '?'}</span>` : ''}</button>`).join('')}</div>`;
   } else {
     main.innerHTML = list.map((it) => {
       if (it.protected) return `<div class="row"><span class="lock">${ICON.lock}</span><div class="thumb" style="opacity:.6"></div><div class="info"><div class="name" style="color:var(--muted)">${esc(it.title)}</div><div class="locked">Protected by the site, can't be saved</div></div></div>`;
       const on = state.chosen.has(it.src), size = fmtSize(sizeOf(it)), q = quality(it);
-      const thumb = it.kind === 'file' ? `<span class="badge ${esc(it.ext)}">${esc(it.ext || 'file')}</span>` : `<div class="thumb" style="${it.thumb ? `background-image:url(&quot;${esc(it.thumb)}&quot;)` : ''}">${it.kind === 'audio' && !it.thumb ? `<span style="left:26px;bottom:12px">♪</span>` : ''}<span>${fmtTime(it.duration)}</span></div>`;
+      const thumb = it.kind === 'file' ? `<span class="badge ${esc(it.ext)}">${esc(it.ext || 'file')}</span>` : `<div class="thumb" style="${it.thumb ? `background-image:${esc(cssUrl(it.thumb))}` : ''}">${it.kind === 'audio' && !it.thumb ? `<span style="left:26px;bottom:12px">♪</span>` : ''}<span>${fmtTime(it.duration)}</span></div>`;
       return `<button class="row${on ? ' on' : ''}" data-src="${esc(it.src)}"><span class="ck" role="checkbox" aria-checked="${on}"></span>${thumb}<div class="info"><div class="name">${esc(it.title)}</div><div class="meta">${it.playing ? '<span class="pill play">Playing</span>' : ''}${q ? `<span class="pill">${esc(q)}</span>` : ''}${it.needsApp ? '<span class="pill app">Uses the app</span>' : ''}${size ? `<span class="size">${size}</span>` : ''}</div></div></button>`;
     }).join('');
   }

@@ -30,19 +30,31 @@ chrome.webRequest.onHeadersReceived.addListener((d) => {
 chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.status === 'loading' && info.url) void chrome.storage.session.remove(key(tabId)); });
 chrome.tabs.onRemoved.addListener((tabId) => void chrome.storage.session.remove(key(tabId)));
 
-chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+// Addresses on this computer or the home network (router, printer): only checked when the page is on one too,
+// so a website cannot make the extension knock on them (Security 323).
+const isPrivate = (h) => /^(localhost|.*\.local|.*\.localhost)$/i.test(h) || /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^\[?(::1|f[cd][0-9a-f]{2}:|fe80:)/i.test(h) || h === '0.0.0.0';
+const site = (h) => h.split('.').slice(-2).join('.');
+
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  // Only the panel itself may ask (never a web page or a script in one).
+  if (sender.id !== chrome.runtime.id || !(sender.url || '').startsWith(chrome.runtime.getURL('popup.html'))) return false;
   if (msg?.type === 'streams') { list(msg.tabId).then(reply); return true; }
-  if (msg?.type === 'sizes') {
-    // File sizes for direct links, asked once when the panel opens (a few at a time).
-    const out = {};
-    const queue = (msg.urls || []).slice(0, 150);
-    const one = async (u) => {
-      // Size and type: a link that looks like a file but answers with a web page (a wiki's "File:" page) is not one.
-      try { const r = await fetch(u, { method: 'HEAD', credentials: 'include' }); out[u] = { size: +(r.headers.get('content-length') || 0), type: (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase(), ok: r.ok }; } catch { /* the site refused: unknown */ }
-    };
-    // Ten at a time, so a page with many links is not flooded.
-    Promise.all(Array.from({ length: 10 }, async () => { while (queue.length) await one(queue.shift()); })).then(() => reply(out));
-    return true;
-  }
+  if (msg?.type === 'sizes') { sizes(msg).then(reply); return true; }
   return false;
 });
+
+async function sizes(msg) {
+  const tab = await chrome.tabs.get(msg.tabId).catch(() => null);
+  let pageHost = ''; try { pageHost = new URL(tab?.url || '').hostname; } catch { /* no page */ }
+  const out = {};
+  const queue = (msg.urls || []).slice(0, 150).filter((u) => { try { const h = new URL(u).hostname; return /^https?:$/.test(new URL(u).protocol) && (!isPrivate(h) || isPrivate(pageHost)); } catch { return false; } });
+  const one = async (u) => {
+    // Size and type: a link that looks like a file but answers with a web page (a wiki's "File:" page) is not one.
+    // Cookies go only to the same site as the page (where the person is signed in anyway).
+    const same = pageHost && site(new URL(u).hostname) === site(pageHost);
+    try { const r = await fetch(u, { method: 'HEAD', credentials: same ? 'include' : 'omit' }); out[u] = { size: +(r.headers.get('content-length') || 0), type: (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase(), ok: r.ok }; } catch { /* the site refused: unknown */ }
+  };
+  // Ten at a time, so a page with many links is not flooded.
+  await Promise.all(Array.from({ length: 10 }, async () => { while (queue.length) await one(queue.shift()); }));
+  return out;
+}

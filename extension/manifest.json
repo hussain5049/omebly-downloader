@@ -3,7 +3,7 @@
   "name": "Omebly Downloader",
   "version": "0.1.0",
   "description": "See every video, audio, image and file on a page, tick what you want, and download it.",
-  "permissions": ["webRequest", "downloads", "scripting", "storage", "tabs"],
+  "permissions": ["webRequest", "downloads", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": {
