@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Omebly Downloader</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <nav class="side" aria-label="Lists">
+    <button class="nav on" data-view="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Downloading<span class="n" id="n-active">0</span></button>
+    <button class="nav" data-view="waiting"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Waiting<span class="n" id="n-waiting">0</span></button>
+    <button class="nav" data-view="done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Finished<span class="n" id="n-done">0</span></button>
+    <div class="grow"></div>
+    <button class="nav" data-view="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Settings</button>
+    <div class="eng" id="eng">Checking the engines…</div>
+  </nav>
+  <main class="main">
+    <header class="bar">
+      <h1 id="title">Downloading</h1>
+      <span class="speed mono" id="speed"></span>
+      <div class="grow"></div>
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" placeholder="Search downloads" spellcheck="false"></label>
+      <button class="btn" id="b-pause">Pause all</button>
+      <button class="btn pri" id="b-add">+ Add a link</button>
+    </header>
+    <section id="list" class="list" aria-live="polite"></section>
+    <section id="settings" class="settings" hidden></section>
+    <footer class="foot" id="foot"></footer>
+  </main>
+</div>
+<dialog id="add">
+  <form method="dialog">
+    <h2>Add a link</h2>
+    <p>Paste one or more links: a video page (YouTube and 1,000+ sites), a stream, or any file.</p>
+    <textarea id="links" rows="5" placeholder="https://…" spellcheck="false"></textarea>
+    <div class="row-end"><button class="btn" value="cancel">Cancel</button><button class="btn pri" id="b-go" value="go">Download</button></div>
+  </form>
+</dialog>
+<script src="app.js"></script>
+</body>
+</html>

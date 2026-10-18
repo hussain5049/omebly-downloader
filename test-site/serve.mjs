@@ -7,6 +7,11 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const port = +(process.env.PORT || 4430);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.mp4': 'video/mp4', '.mp3': 'audio/mpeg', '.m3u8': 'application/vnd.apple.mpegurl', '.ts': 'video/mp2t', '.jpg': 'image/jpeg', '.png': 'image/png', '.pdf': 'application/pdf', '.zip': 'application/zip', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+function slow(res, body) {
+  let at = 0;
+  const next = () => { if (res.destroyed) return; if (at >= body.length) { res.end(); return; } res.write(body.subarray(at, at + 256 * 1024)); at += 256 * 1024; setTimeout(next, 100); };
+  next();
+}
 createServer(async (req, res) => {
   let path; try { path = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end(); return; }
   if (path.includes('..')) { res.writeHead(400).end(); return; }
@@ -19,10 +24,14 @@ createServer(async (req, res) => {
       const a = range[1] ? +range[1] : 0, b = range[2] ? Math.min(+range[2], st.size - 1) : st.size - 1;
       const body = (await readFile(file)).subarray(a, b + 1);
       res.writeHead(206, { 'content-type': type, 'content-length': body.length, 'content-range': `bytes ${a}-${b}/${st.size}`, 'accept-ranges': 'bytes' });
-      res.end(req.method === 'HEAD' ? undefined : body); return;
+      if (req.method === 'HEAD') { res.end(); return; }
+      // big.bin is sent like a busy server: about 2.5 MB/s for each connection (so more connections are faster).
+      if (file.endsWith('big.bin')) { slow(res, body); return; }
+      res.end(body); return;
     }
     res.writeHead(200, { 'content-type': type, 'content-length': st.size, 'accept-ranges': 'bytes', 'cache-control': 'no-store' });
     if (req.method === 'HEAD') { res.end(); return; }
+    if (file.endsWith('big.bin')) { slow(res, await readFile(file)); return; }
     res.end(await readFile(file));
   } catch { res.writeHead(404).end('not found'); }
 }).listen(port, '127.0.0.1', () => console.log(`test site on http://127.0.0.1:${port}/`));

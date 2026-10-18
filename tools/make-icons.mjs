@@ -3,7 +3,7 @@ import { PNG } from 'pngjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 const MINT = [46, 242, 179], INK = [4, 19, 13];
 mkdirSync(new URL('../extension/icons/', import.meta.url), { recursive: true });
-for (const S of [16, 32, 48, 128]) {
+for (const S of [16, 32, 48, 128, 1024]) {
   const png = new PNG({ width: S, height: S }), k = 4; // 4x4 samples per pixel for smooth edges
   const r = S * 0.22, sw = Math.max(1.2, S * 0.105);
   const inBox = (x, y) => { const cx = Math.min(Math.max(x, r), S - r), cy = Math.min(Math.max(y, r), S - r); return (x - cx) ** 2 + (y - cy) ** 2 <= r * r; };
@@ -17,6 +17,6 @@ for (const S of [16, 32, 48, 128]) {
     for (let c = 0; c < 3; c++) png.data[i + c] = Math.round(MINT[c] * (1 - t) + INK[c] * t);
     png.data[i + 3] = Math.round(a * 255);
   }
-  writeFileSync(new URL(`../extension/icons/${S}.png`, import.meta.url), PNG.sync.write(png));
+  writeFileSync(new URL(S === 1024 ? '../app/app-icon.png' : `../extension/icons/${S}.png`, import.meta.url), PNG.sync.write(png));
 }
 console.log('icons written');

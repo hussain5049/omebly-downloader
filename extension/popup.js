@@ -20,7 +20,10 @@ const quality = (it) => it.height ? (it.height >= 2000 ? '4K' : `${it.height}p`)
 const cssUrl = (u) => (/^https?:\/\//i.test(u || '') ? `url("${u.replace(/["'()\\\s<>;]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())}")` : 'none');
 const safe = (s) => (s || 'Download').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Download';
 
-const state = { tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {} };
+const state = { tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {}, app: false };
+const HOST = 'com.omebly.downloader';
+// Is the Omebly Downloader app installed? (It answers through the browser's link to programs.)
+const appReady = chrome.runtime.sendNativeMessage(HOST, { type: 'hello' }).then((r) => !!r?.ok).catch(() => false);
 
 async function load() {
   // For tests the panel can be opened as a page with ?tab=<id>; normally it is the current tab.
@@ -136,11 +139,12 @@ function render(mode) {
   }
   // Footer: where it goes, and the button.
   const sel = state.items.filter((i) => state.chosen.has(i.src) && !i.protected && i.kind === state.kind);
-  const direct = sel.filter((i) => !i.needsApp), viaApp = sel.length - direct.length, total = direct.reduce((s, i) => s + sizeOf(i), 0);
+  // With the app everything goes to it (16 parts, streams, YouTube); without it, direct links use the browser.
+  const direct = state.app ? sel : sel.filter((i) => !i.needsApp), viaApp = sel.length - direct.length, total = direct.reduce((s, i) => s + sizeOf(i), 0);
   $('foot').hidden = !pickable.length;
   $('where').textContent = `Downloads\\Omebly\\${safe(state.page.title)}${direct.length > 1 && media ? ', numbered in order' : ''}`;
   $('note').hidden = !viaApp;
-  $('note').textContent = viaApp ? `${viaApp} ${viaApp === 1 ? 'needs' : 'need'} the Omebly Downloader app (streams and sites like YouTube). The app arrives in the next step.` : '';
+  $('note').textContent = viaApp ? `${viaApp} ${viaApp === 1 ? 'needs' : 'need'} the Omebly Downloader app (streams and sites like YouTube). Install it, then open this panel again.` : '';
   $('go').disabled = !direct.length;
   $('go-label').textContent = direct.length ? `Download ${direct.length} ${direct.length === 1 ? one : many}${total ? ` · ${fmtSize(total)}` : ''}` : viaApp ? 'Needs the Omebly Downloader app' : 'Choose something to download';
 }
@@ -161,12 +165,27 @@ document.addEventListener('click', (e) => {
 });
 
 async function download() {
-  // Step 1: direct links through the browser's own downloads, in a folder named after the page, numbered when
+  const sel = visible().filter((i) => state.chosen.has(i.src) && !i.protected).sort((a, b) => a.order - b.order);
+  const noun = (n) => (n === 1 ? NOUN[state.kind][0] : NOUN[state.kind][1]);
+  if (state.app) {
+    // To the app: the page's address (sites check where a video was opened from), this browser's name, and the
+    // sign-in cookies of only the sites these downloads come from (needed for courses you are signed in to).
+    const hosts = new Set([state.tab.url, ...sel.map((i) => i.src)].map((u) => { try { return new URL(u).origin + '/'; } catch { return null; } }).filter(Boolean));
+    const cookies = [];
+    for (const url of hosts) for (const c of await chrome.cookies.getAll({ url }).catch(() => [])) cookies.push({ domain: c.domain, path: c.path, name: c.name, value: c.value, secure: c.secure, expires: c.expirationDate || 0, hostOnly: c.hostOnly });
+    const msg = { type: 'download', page: { url: state.tab.url, title: state.page.title }, headers: { referer: state.tab.url, userAgent: navigator.userAgent }, cookies,
+      items: sel.map((i) => ({ url: i.src, title: i.title, kind: i.kind, needsApp: !!i.needsApp, ext: i.ext || '', height: i.height || 0 })) };
+    const r = await chrome.runtime.sendNativeMessage(HOST, msg).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+    $('go-label').textContent = r?.ok ? `Sent ${sel.length} ${noun(sel.length)} to Omebly Downloader` : 'Could not reach the app. Open Omebly Downloader and try again.';
+    $('go').disabled = !!r?.ok;
+    return;
+  }
+  // No app: direct links through the browser's own downloads, in a folder named after the page, numbered when
   // there are several (so a course's lessons stay in order).
-  const sel = visible().filter((i) => state.chosen.has(i.src) && !i.protected && !i.needsApp).sort((a, b) => a.order - b.order);
-  const folder = safe(state.page.title), numbered = sel.length > 1 && (state.kind === 'video' || state.kind === 'audio');
+  const direct = sel.filter((i) => !i.needsApp);
+  const folder = safe(state.page.title), numbered = direct.length > 1 && (state.kind === 'video' || state.kind === 'audio');
   let n = 0;
-  for (const it of sel) {
+  for (const it of direct) {
     n++;
     const ext = it.ext || (state.kind === 'image' ? 'jpg' : 'bin');
     // Numbered in page order; a number the site already put in front ("3. Components") is not repeated.
@@ -174,8 +193,9 @@ async function download() {
     const name = `${numbered ? String(n).padStart(2, '0') + ' ' : ''}${title}`.replace(new RegExp(`\\.${ext}$`, 'i'), '');
     try { await chrome.downloads.download({ url: it.src, filename: `Omebly/${folder}/${name}.${ext}`, conflictAction: 'uniquify' }); } catch { /* the browser shows its own message */ }
   }
-  $('go-label').textContent = `Started ${sel.length} ${sel.length === 1 ? NOUN[state.kind][0] : NOUN[state.kind][1]}`;
+  $('go-label').textContent = `Started ${direct.length} ${noun(direct.length)}`;
   $('go').disabled = true;
 }
 
+appReady.then((ok) => { state.app = ok; if (state.items.length) render(); });
 void load();

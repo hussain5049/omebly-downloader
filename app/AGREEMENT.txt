@@ -1,0 +1,18 @@
+OMEBLY DOWNLOADER: BEFORE YOU INSTALL
+
+You are responsible for what you download.
+
+Download only videos, music and files that you own, that are free to save, or that you have permission to save.
+Many websites have their own rules about downloading. Following them is up to you.
+
+Omebly is not responsible for how this app is used or for anything you download with it.
+
+Videos locked with copy protection (DRM) are not downloaded.
+
+Omebly Downloader is free and open-source software, released under the GNU General Public License, version 3 or
+later (GPL-3.0-or-later). It comes with no warranty. It uses yt-dlp (public domain, The Unlicense) and FFmpeg
+(GPL/LGPL).
+
+Privacy: Omebly Downloader sends nothing to Omebly. Your list of downloads and your settings stay on this computer.
+
+To install, choose "I accept the agreement".

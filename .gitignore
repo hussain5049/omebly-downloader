@@ -1,3 +1,9 @@
 node_modules/
 tests/out/
 test-site/media/
+app/node_modules/
+app/src-tauri/target/
+app/src-tauri/tools/
+app/src-tauri/gen/
+tools/ext-key.json
+*.exe

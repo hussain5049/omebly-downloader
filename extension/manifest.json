@@ -1,24 +1,51 @@
 {
   "manifest_version": 3,
   "name": "Omebly Downloader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "See every video, audio, image and file on a page, tick what you want, and download it.",
-  "permissions": ["webRequest", "downloads", "scripting", "storage"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": [
+    "webRequest",
+    "downloads",
+    "scripting",
+    "storage",
+    "nativeMessaging",
+    "cookies"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "action": {
     "default_title": "Omebly Downloader",
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
   },
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["page-hook.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "page-hook.js"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "world": "MAIN"
     }
-  ]
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo1XzuyQyr1AOhQyfALEGWvuZglxMltcvm4sqmFHC2G6GomZKt2QC5jzfo/G6sPpm9E57ieRcOHV5OEvfSNAQTBwhEbyfebTZTKtcGkVKtax5M8ReQdhnM3XS57m6g/DlZzhPsjFHUUIN4NZq15ymJLX6+8qOYKUeqwS9wmAPIL4xyZAG34T4+MMrWJHWqO3QF7Gtfl4XYd8VMBv6nIeRUzkzow6Ukp0ONxvUZV6x2wz0tK6AgVocvwxlU5uV/YEu6D3gYcRqzsLEHlrzsIys3uaTwJtCANWj/v/J7bpySAvfCGqL7E/PfVaR9RgEb6/p4ScrDE0VHvkfGs61CJUjJQIDAQAB"
 }
