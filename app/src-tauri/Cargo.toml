@@ -1,6 +1,6 @@
 [package]
 name = "omebly-downloader"
-version = "0.2.4"
+version = "0.3.0"
 description = "Omebly Downloader: downloads videos, audio, images and files at full speed"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -11,6 +11,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }

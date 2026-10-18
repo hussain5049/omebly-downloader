@@ -8,7 +8,8 @@ use engine::{Incoming, Manager, Settings};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{Emitter, Manager as _, State};
+use tauri::{AppHandle, Emitter, Manager as _, State};
+use tauri_plugin_updater::UpdaterExt;
 
 type Shared = Arc<Manager>;
 
@@ -54,7 +55,7 @@ fn save_settings(m: State<Shared>, s: Settings) {
 }
 #[tauri::command]
 fn tools(m: State<Shared>) -> serde_json::Value {
-    serde_json::json!({ "ytdlp": m.ytdlp.as_ref().map(|p| p.to_string_lossy().to_string()), "ffmpeg": m.ffmpeg_dir.as_ref().map(|p| p.to_string_lossy().to_string()), "version": env!("CARGO_PKG_VERSION") })
+    serde_json::json!({ "ytdlp": m.ytdlp.as_ref().map(|p| p.to_string_lossy().to_string()), "ffmpeg": m.ffmpeg_dir.as_ref().map(|p| p.to_string_lossy().to_string()), "version": env!("CARGO_PKG_VERSION"), "test": std::env::var_os("OMEBLY_DATA_DIR").is_some() })
 }
 /// Shows a finished file in Explorer (or opens it).
 #[tauri::command]
@@ -71,6 +72,44 @@ fn reveal(m: State<Shared>, id: u64, open: bool) {
         if open && !runs { cmd.arg(&target); } else { cmd.raw_arg(format!("/select,\"{}\"", target.replace('"', ""))); }
         let _ = cmd.creation_flags(0x0800_0000).spawn();
     }
+}
+
+/// A newer version on omebly.com, if there is one (checked against the signed list; nothing about the person is sent).
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Option<serde_json::Value> {
+    let u = app.updater().ok()?.check().await.ok()??;
+    Some(serde_json::json!({ "version": u.version, "notes": u.body }))
+}
+/// Downloads the update (its signature is checked with the key built into the app), pauses the list and installs it.
+/// The installer restarts the app; the extension notices its new version and reloads itself.
+#[tauri::command]
+async fn install_update(app: AppHandle, m: State<'_, Shared>) -> Result<(), String> {
+    let u = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?.ok_or("Already up to date")?;
+    let bytes = u.download(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+    for j in m.snapshot() { if matches!(j.state, engine::State::Downloading | engine::State::Waiting) { m.pause(j.id) } }
+    m.save();
+    u.install(bytes).map_err(|e| e.to_string())?;
+    app.restart();
+}
+/// Opens Omebly's Google review page in the browser (only when the person clicks "Write a review"; the address is fixed).
+#[tauri::command]
+fn open_review() {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("explorer").arg("https://g.page/r/CSsLfEznAn7NEBM/review").creation_flags(0x0800_0000).spawn();
+    }
+}
+/// Shows the extension folder that came with the app (for the one-time "Load unpacked" step).
+#[tauri::command]
+fn show_extension() -> Option<String> {
+    let dir = bridge::extension_dir()?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("explorer").arg(&dir).creation_flags(0x0800_0000).spawn();
+    }
+    Some(dir.to_string_lossy().to_string())
 }
 
 /// Takes the messages the extension left in the inbox.
@@ -101,6 +140,7 @@ fn main() {
         }));
     }
     builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let downloads = std::env::var_os("OMEBLY_DOWNLOADS").map(std::path::PathBuf::from).or_else(|| app.path().download_dir().ok()).unwrap_or_else(bridge::data_dir);
             // Leftovers from a crash: cookie files for downloads that ended are removed at start (Security 324).
@@ -124,7 +164,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![list, pause, resume, remove, pause_all, resume_all, clear_finished, add_links, settings, save_settings, tools, reveal])
+        .invoke_handler(tauri::generate_handler![list, pause, resume, remove, pause_all, resume_all, clear_finished, add_links, settings, save_settings, tools, reveal, check_update, install_update, show_extension, open_review])
         .run(tauri::generate_context!())
         .expect("Omebly Downloader could not start");
 }

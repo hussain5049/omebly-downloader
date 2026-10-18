@@ -76,3 +76,11 @@ dialog h2 { font-weight: 800; font-size: 18px; } dialog p { color: var(--muted);
 textarea { width: 100%; border: 0; border-radius: 12px; background: var(--ink2); color: var(--text); font: 13px 'Cascadia Mono', Consolas, monospace; padding: 12px; resize: vertical; }
 .row-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: var(--ink3); border-radius: 5px; }
+
+/* A new version, and the one-time review ask (never required). */
+.upd { margin: 8px 4px 4px; padding: 12px; border-radius: 12px; background: #10202B; font-size: 11.5px; color: #8CC7FF; line-height: 1.5; display: flex; flex-direction: column; gap: 8px; }
+.upd b { color: var(--text); }
+.upd .btn { height: 32px; font-size: 12px; }
+.ask { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 10px 14px; border-radius: 12px; background: var(--card); font-size: 12.5px; color: var(--soft); }
+.ask span { flex: 1; }
+.ask .btn { height: 30px; font-size: 12px; }

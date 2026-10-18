@@ -6,11 +6,22 @@ Free and open source (GPL-3.0-or-later). Made by Omebly.
 > You are responsible for what you download. Download only what you own, what is free to save, or what you have
 > permission to save. Videos locked with copy protection (DRM) are shown as "Protected" and never downloaded.
 
-## Status
+## Install
 
-Step 1 of 7: the browser extension finds everything on a page. Direct links (videos, audio, images, files)
-download through the browser for now; streams and sites like YouTube need the Windows app, which comes in the
-next steps.
+Download the installer from https://omebly.com/tools/downloader/ and run it. Then add the extension once:
+
+1. In the app, open Settings and click **Show folder** (the extension that came with the app).
+2. Open `chrome://extensions` (Edge: `edge://extensions`, Brave: `brave://extensions`) and turn on **Developer mode**.
+3. Click **Load unpacked**, choose that folder, and pin the green Omebly Downloader button.
+
+**Updates:** the app checks for a new version when it opens and shows **Update now**. Updates are signed with
+Omebly's update key, and the same update refreshes the extension (it reloads itself from the app's folder).
+[PRIVACY.md](PRIVACY.md) says what the app sends (only the update check).
+
+## Releasing (maintainers)
+
+Raise the version in `app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml` and `extension/manifest.json`,
+then run `bash tools/release.sh "what is new"`. It needs the update key in `~/.omebly-keys/`, which is never committed.
 
 ## Try the extension (Chrome, Edge or Brave)
 

@@ -76,8 +76,32 @@ async function renderSettings() {
     <div class="card wide"><h3>Engines</h3>
       <div class="line"><div style="flex:1;min-width:0"><div>Site reader (yt-dlp)</div><div class="sub">${tools.ytdlp ? esc(tools.ytdlp) : 'Not found: YouTube and streams cannot download'}</div></div></div>
       <div class="line"><div style="flex:1;min-width:0"><div>Video joiner (FFmpeg)</div><div class="sub">${tools.ffmpeg ? esc(tools.ffmpeg) : 'Not found: video and audio stay in separate files'}</div></div></div></div>
+    <div class="card wide"><h3>Browser extension and updates</h3>
+      <div class="line"><div style="flex:1;min-width:0"><div>Extension folder</div><div class="sub">One time only: in chrome://extensions turn on Developer mode, click Load unpacked and choose this folder. After that the app updates the extension for you.</div></div><button class="btn" id="s-ext">Show folder</button></div>
+      <div class="line"><div style="flex:1;min-width:0"><div>Updates</div><div class="sub" id="s-upd">The app checks omebly.com when it opens. Updates are signed, and nothing about you is sent.</div></div><button class="btn" id="s-check">Check now</button></div></div>
     <div class="card wide" style="display:flex;align-items:center;gap:14px"><div style="flex:1"><div style="font-weight:800">Omebly Downloader ${esc(tools.version)} · free and open source (GPL-3.0)</div><div class="sub">You are responsible for what you download. Download only what you have the right to save. Videos locked with copy protection are never downloaded.</div></div><button class="btn pri" id="s-save">Save</button></div>`;
+  $('s-ext').onclick = () => invoke('show_extension');
+  $('s-check').onclick = async () => { $('s-upd').textContent = 'Checking…'; const u = await invoke('check_update').catch(() => null); $('s-upd').textContent = u ? `Version ${u.version} is ready.` : 'You have the latest version.'; showUpdate(u); };
   $('s-save').onclick = async () => { await invoke('save_settings', { s: { folder: $('s-folder').value.trim() || s.folder, connections: +$('s-conn').value || 16, at_once: +$('s-once').value || 3 } }); $('s-save').textContent = 'Saved'; setTimeout(() => { if ($('s-save')) $('s-save').textContent = 'Save'; }, 1500); };
+}
+
+// A new version: one click downloads it, checks its signature, installs it and opens the app again.
+function showUpdate(u) {
+  if (!u) return;
+  $('upd').hidden = false;
+  $('upd').innerHTML = `<div><b>Version ${esc(u.version)} is ready</b><br>Your downloads pause and carry on after.</div><button class="btn pri" id="b-update">Update now</button>`;
+  $('b-update').onclick = async () => { $('b-update').disabled = true; $('b-update').textContent = 'Updating…'; try { await invoke('install_update'); } catch (e) { $('b-update').disabled = false; $('b-update').textContent = 'Try again'; } };
+}
+// After a few finished downloads, ask once (politely, never required) for a review. "Not now" or a click ends it for good.
+const ASKED = 'omebly-review-asked';
+function maybeAsk() {
+  let asked = true; try { asked = !!localStorage.getItem(ASKED); } catch { /* no storage: never ask */ }
+  if (asked || document.querySelector('.ask') || jobs.filter((j) => j.state === 'done').length < 3) return;
+  const box = document.createElement('div');
+  box.className = 'ask';
+  box.innerHTML = '<span>Is Omebly Downloader helping you? A review helps other people find it.</span><button class="btn" data-ask="no">Not now</button><button class="btn pri" data-ask="yes">Write a review</button>';
+  $('list').before(box);
+  box.onclick = (e) => { const a = e.target.closest('[data-ask]')?.dataset.ask; if (!a) return; try { localStorage.setItem(ASKED, '1'); } catch { /* fine */ } if (a === 'yes') invoke('open_review'); box.remove(); };
 }
 
 document.addEventListener('click', async (e) => {
@@ -100,5 +124,7 @@ $('q').addEventListener('input', () => { q = $('q').value.trim().toLowerCase(); 
   render();
   tools = await invoke('tools');
   $('eng').innerHTML = tools.ytdlp && tools.ffmpeg ? 'Engines ready<br><span style="color:var(--faint)">yt-dlp and FFmpeg found</span>' : `<b>${!tools.ytdlp ? 'yt-dlp' : 'FFmpeg'} not found</b><br>YouTube and streams need it`;
-  await listen('jobs', (ev) => { const was = jobs; jobs = ev.payload; if (view === 'done' && jobs.length > was.length) view = 'active'; render(); });
+  await listen('jobs', (ev) => { const was = jobs; jobs = ev.payload; if (view === 'done' && jobs.length > was.length) view = 'active'; render(); maybeAsk(); });
+  maybeAsk();
+  if (!tools.test) invoke('check_update').then(showUpdate).catch(() => {});
 })();

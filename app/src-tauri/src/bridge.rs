@@ -39,6 +39,15 @@ fn write_message(v: &serde_json::Value) {
     let _ = out.flush();
 }
 
+/// The extension that came with this app (in its install folder). The extension compares it with itself and reloads
+/// when the app was updated, so one update covers both.
+pub fn extension_dir() -> Option<PathBuf> { Some(std::env::current_exe().ok()?.parent()?.join("extension")) }
+fn extension_version() -> Option<String> {
+    let b = std::fs::read(extension_dir()?.join("manifest.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_slice(&b).ok()?;
+    v.get("version")?.as_str().map(str::to_string)
+}
+
 pub fn run() {
     let origin_ok = std::env::args().skip(1).any(|a| a == format!("chrome-extension://{EXTENSION_ID}/"));
     let Some(msg) = read_message() else { return };
@@ -47,7 +56,7 @@ pub fn run() {
         return;
     }
     match msg.get("type").and_then(|t| t.as_str()) {
-        Some("hello") => write_message(&serde_json::json!({ "ok": true, "app": env!("CARGO_PKG_VERSION") })),
+        Some("hello") => write_message(&serde_json::json!({ "ok": true, "app": env!("CARGO_PKG_VERSION"), "extension": extension_version() })),
         Some("download") => {
             let dir = inbox();
             let _ = std::fs::create_dir_all(&dir);

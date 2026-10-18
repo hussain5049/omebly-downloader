@@ -62,3 +62,22 @@ async function sizes(msg) {
   await Promise.all(Array.from({ length: 10 }, async () => { while (queue.length) await one(queue.shift()); }));
   return out;
 }
+
+// Updates: the Windows app carries the newest extension in its install folder (the folder loaded with "Load
+// unpacked"). When the app was updated, the files there are newer than this running copy, so reload once to use them.
+const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 4; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+async function checkForUpdate() {
+  try {
+    const r = await chrome.runtime.sendNativeMessage('com.omebly.downloader', { type: 'hello' });
+    const mine = chrome.runtime.getManifest().version;
+    if (!r?.extension || !newer(r.extension, mine)) return;
+    // Once for each new version: if this copy was loaded from somewhere else, it would not change, so never loop.
+    const { reloadedFor } = await chrome.storage.local.get('reloadedFor');
+    if (reloadedFor === r.extension) return;
+    await chrome.storage.local.set({ reloadedFor: r.extension });
+    chrome.runtime.reload();
+  } catch { /* the app is not installed: nothing to update from */ }
+}
+chrome.runtime.onStartup.addListener(checkForUpdate);
+chrome.alarms?.create('update', { periodInMinutes: 360 });
+chrome.alarms?.onAlarm.addListener((a) => { if (a.name === 'update') void checkForUpdate(); });
