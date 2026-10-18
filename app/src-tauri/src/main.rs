@@ -91,12 +91,16 @@ fn main() {
         bridge::run();
         return;
     }
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let mut builder = tauri::Builder::default();
+    // One app at a time; a test copy (OMEBLY_DATA_DIR) stays separate from the real one.
+    if std::env::var_os("OMEBLY_DATA_DIR").is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Opened again (by the extension or by hand): show the window and take any new downloads.
             if let Some(w) = app.get_webview_window("main") { let _ = w.unminimize(); let _ = w.set_focus(); }
             if let Some(m) = app.try_state::<Shared>() { take_inbox(&m); }
-        }))
+        }));
+    }
+    builder
         .setup(|app| {
             let downloads = std::env::var_os("OMEBLY_DOWNLOADS").map(std::path::PathBuf::from).or_else(|| app.path().download_dir().ok()).unwrap_or_else(bridge::data_dir);
             // Leftovers from a crash: cookie files for downloads that ended are removed at start (Security 324).

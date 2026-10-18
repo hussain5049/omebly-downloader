@@ -1,4 +1,5 @@
 // Step 2 test, end to end in Chrome: the installed app registers itself with the browsers, the extension's Download
+// Do not run while Omebly Downloader is in use: it restarts the real app and points it at a test folder for a moment.
 // button sends a course page's lessons to it, and the files arrive. The app's download folder is pointed at a test
 // folder for the run and put back afterwards.
 import { spawn, execFileSync } from 'node:child_process';

@@ -13,7 +13,7 @@ const EXE = join(ROOT, 'app/src-tauri/target', process.env.RELEASE ? 'release' :
 const ID = 'cjaaiapbiobjhmbhdikahgkokpffpoij';
 const SITE = 'http://127.0.0.1:4430';
 const data = mkdtempSync(join(tmpdir(), 'odl-data-')), downloads = mkdtempSync(join(tmpdir(), 'odl-dl-'));
-const env = { ...process.env, OMEBLY_DATA_DIR: data, OMEBLY_DOWNLOADS: downloads, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9333' };
+const env = { ...process.env, OMEBLY_DATA_DIR: data, OMEBLY_DOWNLOADS: downloads, WEBVIEW2_USER_DATA_FOLDER: join(data, 'webview'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9333' };
 let pass = 0, fail = 0;
 const ok = (n, c, info = '') => { console.log(`${c ? 'PASS' : 'FAIL'} ${n}${c ? '' : ' — ' + info}`); c ? pass++ : fail++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -125,5 +125,5 @@ if (process.env.REAL) {
 console.log(`\n${pass} passed, ${fail} failed`);
 try { await cdp?.close(); } catch {}
 app.kill(); server.kill();
-try { execFileSync('taskkill', ['/F', '/IM', 'omebly-downloader.exe'], { stdio: 'ignore' }); } catch {}
+// Only the test's own copy is closed (never an Omebly Downloader the person has open).
 process.exit(fail ? 1 : 0);

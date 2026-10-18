@@ -54,7 +54,8 @@ pub fn run() {
             let name = format!("{}-{}.json", super::engine::now(), std::process::id());
             let ok = std::fs::write(dir.join(&name), serde_json::to_vec(&msg).unwrap_or_default()).is_ok();
             // Open the app (or wake the one already open: it takes the message from the inbox).
-            if let Ok(me) = std::env::current_exe() {
+            // (Under test the app is already open and reads the inbox itself.)
+            if let (Ok(me), None) = (std::env::current_exe(), std::env::var_os("OMEBLY_DATA_DIR")) {
                 let mut cmd = Command::new(me);
                 cmd.arg("--inbox");
                 #[cfg(windows)]

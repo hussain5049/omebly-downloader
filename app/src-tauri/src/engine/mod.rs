@@ -143,12 +143,16 @@ impl Manager {
         let mut added = 0;
         for (n, it) in inc.items.into_iter().enumerate() {
             if !(it.url.starts_with("http://") || it.url.starts_with("https://")) { continue; }
+            // The same link sent twice (Download pressed again) is not downloaded twice while it is still going.
+            if self.jobs.lock().unwrap().iter().any(|j| j.url == it.url && matches!(j.state, State::Waiting | State::Downloading | State::Paused)) { continue; }
             let site = url::Url::parse(&it.url).ok().and_then(|u| u.host_str().map(|h| h.trim_start_matches("www.").to_string())).unwrap_or_default();
             let title = if it.title.is_empty() { "Download".to_string() } else { it.title.clone() };
             let folder = if it.folder.is_empty() { base.join(&group) } else { base.join(safe_name(&it.folder)) };
             let numbered = media > 1 && (it.kind == "video" || it.kind == "audio");
             let plain = strip_number(&title);
             let name = if !it.name.is_empty() { safe_name(&it.name) } else if numbered { safe_name(&format!("{:02} {}", n + 1, plain)) } else { safe_name(&title) };
+            // Two downloads never write the same file: "Lesson", "Lesson (2)", … (also against files already there).
+            let name = self.free_name(&folder, &name);
             // Only a plain extension (letters and digits); anything else becomes "bin" (Security 324).
             let ext = it.ext.trim_start_matches('.').to_ascii_lowercase();
             let ext = if !ext.is_empty() && ext.len() <= 8 && ext.chars().all(|c| c.is_ascii_alphanumeric()) { ext } else if ext.is_empty() { String::new() } else { "bin".into() };
@@ -222,7 +226,7 @@ impl Manager {
                     Ok(path) => { mark_from_internet(path, &j.url, &job.headers); j.state = State::Done; j.saved = path.to_string_lossy().to_string(); j.finished = now(); j.parts = vec![1.0; 16]; if j.total == 0 { j.total = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0); } j.done = j.total; }
                     Err(e) if e == "paused" => { if j.state == State::Downloading { j.state = State::Paused; } }
                     Err(e) if e.starts_with("Protected") => { j.state = State::Protected; j.error = e.clone(); }
-                    Err(e) => { j.state = State::Failed; j.error = e.clone(); }
+                    Err(e) => { j.state = State::Failed; j.error = e.clone(); clean_pieces(&j.folder, &j.name); }
                 }
             });
             self.save();
@@ -255,6 +259,14 @@ impl Manager {
         result
     }
 
+    fn free_name(&self, folder: &Path, name: &str) -> String {
+        let jobs = self.jobs.lock().unwrap();
+        let taken = |n: &str| jobs.iter().any(|j| Path::new(&j.folder) == folder && j.name.eq_ignore_ascii_case(n) && j.state != State::Failed)
+            || std::fs::read_dir(folder).map(|d| d.flatten().any(|e| e.path().file_stem().is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case(n)))).unwrap_or(false);
+        if !taken(name) { return name.to_string(); }
+        (2..1000).map(|k| format!("{name} ({k})")).find(|n| !taken(n)).unwrap_or_else(|| name.to_string())
+    }
+
     pub fn pause(&self, id: u64) {
         if let Some(s) = self.stops.lock().unwrap().get(&id) { s.store(true, Ordering::Relaxed); }
         self.update(id, |j| if j.state == State::Downloading || j.state == State::Waiting { j.state = State::Paused; j.speed = 0.0; });
@@ -282,6 +294,15 @@ fn mark_from_internet(path: &Path, url: &str, headers: &[(String, String)]) {
     let mut stream = path.as_os_str().to_owned();
     stream.push(":Zone.Identifier");
     let _ = std::fs::write(PathBuf::from(stream), body);
+}
+
+/// After a failed site download, the pieces yt-dlp left ("Name.mp4.part-Frag3", "Name.f137.mp4.part") are removed.
+fn clean_pieces(folder: &str, name: &str) {
+    let Ok(dir) = std::fs::read_dir(folder) else { return };
+    for e in dir.flatten() {
+        let f = e.file_name().to_string_lossy().to_string();
+        if f.starts_with(&format!("{name}.")) && (f.contains(".part") || f.ends_with(".ytdl")) { let _ = std::fs::remove_file(e.path()); }
+    }
 }
 
 fn strip_number(t: &str) -> String {
