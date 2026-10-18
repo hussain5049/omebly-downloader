@@ -240,7 +240,18 @@ impl Manager {
     async fn run_site(self: Arc<Self>, job: &Job, stop: Arc<AtomicBool>, connections: usize) -> Result<PathBuf, String> {
         let Some(ytdlp) = self.ytdlp.clone() else { return Err("The site reader (yt-dlp) is missing. Reinstall Omebly Downloader.".into()) };
         sites::check_stream(&self.client, &job.url, &job.headers).await?;
-        let cookies_file = if job.cookies.is_empty() { None } else { write_cookies(&self.data_dir, job.id, &job.cookies) };
+        // YouTube refuses many videos when a signed-in browser's cookies are sent ("The page needs to be reloaded"),
+        // so YouTube is tried without them first; the sign-in is used only if that fails (age or members videos).
+        let youtube = url::Url::parse(&job.url).ok().and_then(|u| u.host_str().map(|h| h.trim_start_matches("www.").trim_start_matches("m.").trim_start_matches("music.").to_string())).is_some_and(|h| h == "youtube.com" || h == "youtu.be");
+        if youtube && !job.cookies.is_empty() {
+            let first = self.clone().run_site_once(job, stop.clone(), connections, false, ytdlp.clone()).await;
+            if first.is_ok() || stop.load(Ordering::Relaxed) { return first; }
+        }
+        self.run_site_once(job, stop, connections, true, ytdlp).await
+    }
+
+    async fn run_site_once(self: Arc<Self>, job: &Job, stop: Arc<AtomicBool>, connections: usize, with_cookies: bool, ytdlp: PathBuf) -> Result<PathBuf, String> {
+        let cookies_file = if job.cookies.is_empty() || !with_cookies { None } else { write_cookies(&self.data_dir, job.id, &job.cookies) };
         let req = sites::SiteRequest {
             url: job.url.clone(), folder: PathBuf::from(&job.folder), name: job.name.clone(), height: job.height, audio_only: job.kind == "audio",
             languages: job.languages.clone(), subtitles: job.subtitles.clone(), headers: job.headers.clone(), cookies_file: cookies_file.clone(), connections,

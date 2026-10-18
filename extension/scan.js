@@ -39,6 +39,7 @@ export function scanPage() {
     for (const a of document.querySelectorAll('a[href*="/watch?v="], a[href^="/shorts/"]')) {
       const u = abs(a.getAttribute('href')); if (!u) continue;
       const id = new URL(u).searchParams.get('v') || (/\/shorts\/([\w-]+)/.exec(u) || [])[1]; if (!id || id === v) continue;
+      if (a.closest('.ytp-chrome-bottom, .ytp-chrome-controls, .ytp-ce-element, .ytp-endscreen-content')) continue; // the player's own Next button and end cards
       const box = a.closest('ytd-playlist-panel-video-renderer, ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-playlist-video-renderer, ytm-shorts-lockup-view-model, yt-lockup-view-model') || a;
       const t = clean(box.querySelector('#video-title, [id="video-title"], h3, .yt-lockup-metadata-view-model__title')?.textContent || a.getAttribute('title') || a.getAttribute('aria-label'));
       if (!t || /^(play all|shuffle|mix)$/i.test(t)) continue;

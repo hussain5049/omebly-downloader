@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Omebly Downloader",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "See every video, audio, image and file on a page, tick what you want, and download it.",
   "permissions": [
     "webRequest",
