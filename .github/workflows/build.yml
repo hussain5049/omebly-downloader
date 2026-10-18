@@ -1,0 +1,64 @@
+# Builds the Windows installer from this repository's code, so every release can be traced to its source.
+# Once SignPath Foundation approves the project, the signing step below sends the installer to SignPath and the
+# signed copy is what gets released. The update signature (for the app's one-click updates) is added afterwards
+# on the maintainer's PC with the update key, which is never stored on GitHub.
+name: Build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bundled yt-dlp (the pinned version, checked by its hash)
+        shell: bash
+        run: |
+          V=$(grep -v '^#' tools/yt-dlp.pin | sed -n 1p | tr -d '\r')
+          H=$(grep -v '^#' tools/yt-dlp.pin | sed -n 2p | tr -d '\r')
+          mkdir -p app/src-tauri/tools
+          curl -fsSL -o app/src-tauri/tools/yt-dlp.exe "https://github.com/yt-dlp/yt-dlp/releases/download/$V/yt-dlp.exe"
+          echo "$H  app/src-tauri/tools/yt-dlp.exe" | sha256sum -c -
+
+      - name: Build the installer
+        working-directory: app
+        shell: bash
+        run: |
+          npm ci
+          npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Keep the unsigned installer
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-unsigned
+          path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+
+      # Turned on after SignPath Foundation approves the project (they give the organisation and project ids;
+      # the API token is added as the repository secret SIGNPATH_API_TOKEN).
+      # - name: Sign with SignPath
+      #   uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: '<from SignPath>'
+      #     project-slug: 'omebly-downloader'
+      #     signing-policy-slug: 'release-signing'
+      #     github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+      #     wait-for-completion: true
+      #     output-artifact-directory: signed
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: installer-signed
+      #     path: signed/

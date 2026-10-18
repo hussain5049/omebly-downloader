@@ -47,3 +47,15 @@ Make the test media once with `bash tools/make-test-media.sh` (needs FFmpeg). `n
 - `extension/page-hook.js` notices copy-protected videos (media keys) and videos played from pieces.
 - `extension/background.js` watches the tab's network for streams (HLS, DASH) and checks links' size and type.
 - `extension/popup.*` is the panel, as in the approved design.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/).
+
+- **Committers and reviewers:** [Hussain (hussain5049)](https://github.com/hussain5049), for Omebly.
+- **Approvers:** [Hussain (hussain5049)](https://github.com/hussain5049). Each release is approved by hand.
+- Only installers built by this repository's GitHub Actions workflow (`.github/workflows/build.yml`) from its own
+  source are signed. The bundled yt-dlp is the official release, checked against the hash in `tools/yt-dlp.pin`.
+- **Privacy:** this program does not send any information to other networked systems unless the user asks for it,
+  except the update check described in [PRIVACY.md](PRIVACY.md).
