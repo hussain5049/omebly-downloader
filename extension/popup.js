@@ -17,7 +17,7 @@ const fmtTime = (s) => { if (!s || !Number.isFinite(s)) return ''; s = Math.roun
 const quality = (it) => it.height ? (it.height >= 2000 ? '4K' : `${it.height}p`) : it.format || (it.needsApp ? '' : (it.ext || '').toUpperCase());
 // A picture's address for CSS: only web addresses, with every character that could end the CSS string encoded
 // (Security 323), so a page cannot change how the panel looks.
-const cssUrl = (u) => (/^https?:\/\//i.test(u || '') ? `url("${u.replace(/["'()\\s<>]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())}")` : 'none');
+const cssUrl = (u) => (/^https?:\/\//i.test(u || '') ? `url("${u.replace(/["'()\\\s<>;]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())}")` : 'none');
 const safe = (s) => (s || 'Download').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Download';
 
 const state = { tab: null, page: { title: '', host: '' }, items: [], kind: 'video', onScreen: true, bigOnly: true, chosen: new Set(), sizes: {} };
