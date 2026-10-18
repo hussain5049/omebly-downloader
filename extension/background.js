@@ -32,8 +32,7 @@ chrome.tabs.onRemoved.addListener((tabId) => void chrome.storage.session.remove(
 
 // Addresses on this computer or the home network (router, printer): only checked when the page is on one too,
 // so a website cannot make the extension knock on them (Security 323).
-const isPrivate = (h) => /^(localhost|.*\.local|.*\.localhost)$/i.test(h) || /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^\[?(::1|f[cd][0-9a-f]{2}:|fe80:)/i.test(h) || h === '0.0.0.0';
-const site = (h) => h.split('.').slice(-2).join('.');
+const isPrivate = (h) => /^(localhost|.*\.local|.*\.localhost)$/i.test(h) || /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^\[?(::1|::ffff:|f[cd][0-9a-f]{2}:|fe80:)/i.test(h) || /^0\./.test(h) || /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h);
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Only the panel itself may ask (never a web page or a script in one).
@@ -50,8 +49,8 @@ async function sizes(msg) {
   const queue = (msg.urls || []).slice(0, 150).filter((u) => { try { const h = new URL(u).hostname; return /^https?:$/.test(new URL(u).protocol) && (!isPrivate(h) || isPrivate(pageHost)); } catch { return false; } });
   const one = async (u) => {
     // Size and type: a link that looks like a file but answers with a web page (a wiki's "File:" page) is not one.
-    // Cookies go only to the same site as the page (where the person is signed in anyway).
-    const same = pageHost && site(new URL(u).hostname) === site(pageHost);
+    // Cookies go only to the page's own address (where the person is signed in anyway).
+    const same = !!pageHost && new URL(u).hostname === pageHost;
     try { const r = await fetch(u, { method: 'HEAD', credentials: same ? 'include' : 'omit' }); out[u] = { size: +(r.headers.get('content-length') || 0), type: (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase(), ok: r.ok }; } catch { /* the site refused: unknown */ }
   };
   // Ten at a time, so a page with many links is not flooded.
