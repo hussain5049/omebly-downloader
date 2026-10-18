@@ -7,3 +7,4 @@ app/src-tauri/tools/
 app/src-tauri/gen/
 tools/ext-key.json
 *.exe
+Omebly-Downloader-Extension-*.zip

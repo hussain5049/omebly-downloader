@@ -38,6 +38,18 @@
     <div class="row-end"><button class="btn" value="cancel">Cancel</button><button class="btn pri" id="b-go" value="go">Download</button></div>
   </form>
 </dialog>
+<dialog id="ext">
+  <h2>Add Omebly Downloader to your browser</h2>
+  <p>One time only, about a minute. Works in Chrome, Edge and Brave. After this, updates come by themselves.</p>
+  <ol class="steps">
+    <li><b>Open the extensions page.</b> Click Copy, then paste it into your browser&#39;s address bar and press Enter.<div class="cp"><code>chrome://extensions</code><button class="btn" data-copy="chrome://extensions">Copy</button></div></li>
+    <li><b>Turn on Developer mode.</b> The switch is at the top right (in Edge, at the bottom left).</li>
+    <li><b>Click Load unpacked.</b> Click Copy below, paste it into the Folder box of the window that opens, then click Select Folder.<div class="cp"><code id="ext-folder"></code><button class="btn" id="ext-copy-folder">Copy</button></div></li>
+    <li><b>Pin it.</b> Click the puzzle piece next to the address bar and pin the green Omebly button.</li>
+  </ol>
+  <p class="ext-state" id="ext-state">Waiting for the extension…</p>
+  <div class="row-end"><button class="btn" id="ext-later">Later</button><button class="btn pri" id="ext-done">Done</button></div>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

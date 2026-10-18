@@ -100,6 +100,12 @@ fn open_review() {
         let _ = std::process::Command::new("explorer").arg("https://g.page/r/CSsLfEznAn7NEBM/review").creation_flags(0x0800_0000).spawn();
     }
 }
+/// Whether the browser extension has talked to this app, and where its folder is (for the setup guide).
+#[tauri::command]
+fn extension_status() -> serde_json::Value {
+    let seen = std::fs::metadata(bridge::data_dir().join("extension-seen")).is_ok();
+    serde_json::json!({ "connected": seen, "folder": bridge::extension_dir().map(|d| d.to_string_lossy().to_string()).unwrap_or_default() })
+}
 /// Shows the extension folder that came with the app (for the one-time "Load unpacked" step).
 #[tauri::command]
 fn show_extension() -> Option<String> {
@@ -164,7 +170,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![list, pause, resume, remove, pause_all, resume_all, clear_finished, add_links, settings, save_settings, tools, reveal, check_update, install_update, show_extension, open_review])
+        .invoke_handler(tauri::generate_handler![list, pause, resume, remove, pause_all, resume_all, clear_finished, add_links, settings, save_settings, tools, reveal, check_update, install_update, show_extension, open_review, extension_status])
         .run(tauri::generate_context!())
         .expect("Omebly Downloader could not start");
 }

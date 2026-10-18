@@ -84,3 +84,16 @@ textarea { width: 100%; border: 0; border-radius: 12px; background: var(--ink2);
 .ask { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 10px 14px; border-radius: 12px; background: var(--card); font-size: 12.5px; color: var(--soft); }
 .ask span { flex: 1; }
 .ask .btn { height: 30px; font-size: 12px; }
+
+/* The one-time extension setup guide. */
+#ext { width: 600px; }
+#ext .steps { margin: 4px 0 10px 20px; display: grid; gap: 12px; color: var(--soft); font-size: 13px; line-height: 1.5; }
+#ext .steps b { color: var(--text); }
+#ext .cp { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+#ext .cp code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px "Cascadia Mono", Consolas, monospace; background: var(--ink); border-radius: 8px; padding: 8px 10px; color: var(--text); }
+#ext .cp .btn { height: 32px; font-size: 12px; }
+.ext-state { font-weight: 700; color: var(--amber) !important; }
+.ext-state.ok { color: var(--mint) !important; }
+#ext { box-sizing: border-box; max-width: calc(100vw - 40px); overflow-x: hidden; }
+#ext .steps li { min-width: 0; }
+.upd[hidden] { display: none; }

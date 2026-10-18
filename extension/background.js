@@ -79,5 +79,7 @@ async function checkForUpdate() {
   } catch { /* the app is not installed: nothing to update from */ }
 }
 chrome.runtime.onStartup.addListener(checkForUpdate);
+// Right after it is added: say hello, so the app can show "Extension connected".
+chrome.runtime.onInstalled.addListener(checkForUpdate);
 chrome.alarms?.create('update', { periodInMinutes: 360 });
 chrome.alarms?.onAlarm.addListener((a) => { if (a.name === 'update') void checkForUpdate(); });

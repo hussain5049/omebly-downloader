@@ -23,6 +23,9 @@ export PATH="$HOME/.cargo/bin:$PATH" TAURI_SIGNING_PRIVATE_KEY="$KEY" TAURI_SIGN
 OUT="app/src-tauri/target/release/bundle/nsis/Omebly Downloader_${V}_x64-setup.exe"
 FILE="Omebly-Downloader-Setup-$V.exe"
 cp "$OUT" "$FILE"
+# The extension on its own, for people who only want it (the app carries the same one and keeps it updated).
+EXT="Omebly-Downloader-Extension-$V.zip"
+rm -f "$EXT"; (cd extension && /c/Windows/System32/tar.exe -a -c -f "../$EXT" *)
 
 node -e '
 const [v, notes, sigFile, url] = process.argv.slice(1);
@@ -33,11 +36,13 @@ fs.writeFileSync("latest.json", JSON.stringify({ version: v, notes, pub_date: ne
 
 ssh -i "$SSH_KEY" "$HOST" 'mkdir -p /opt/omebly/downloads/downloader'
 ssh -i "$SSH_KEY" "$HOST" "cat > /opt/omebly/downloads/downloader/$FILE" < "$FILE"
+ssh -i "$SSH_KEY" "$HOST" "cat > /opt/omebly/downloads/downloader/$EXT" < "$EXT"
+ssh -i "$SSH_KEY" "$HOST" "cd /opt/omebly/downloads/downloader && ln -sfn $EXT OmeblyDownloaderExtension.zip"
 # The website button always gets the newest: OmeblyDownloaderSetup.exe points at it.
 ssh -i "$SSH_KEY" "$HOST" "cd /opt/omebly/downloads/downloader && ln -sfn $FILE OmeblyDownloaderSetup.exe"
 # The update list goes up last, so the app never sees a version whose file is not there yet.
 ssh -i "$SSH_KEY" "$HOST" "cat > /opt/omebly/downloads/downloader/latest.json" < latest.json
-ssh -i "$SSH_KEY" "$HOST" 'cd /opt/omebly/downloads/downloader && ls -1t Omebly-Downloader-Setup-*.exe | tail -n +4 | xargs -r rm -f'
+ssh -i "$SSH_KEY" "$HOST" 'cd /opt/omebly/downloads/downloader && ls -1t Omebly-Downloader-Setup-*.exe | tail -n +4 | xargs -r rm -f; ls -1t Omebly-Downloader-Extension-*.zip | tail -n +4 | xargs -r rm -f'
 rm -f latest.json
 curl -s "$BASE/latest.json"; echo
 curl -sI "$BASE/OmeblyDownloaderSetup.exe" | grep -i -E "^(HTTP|content-length|content-disposition)"

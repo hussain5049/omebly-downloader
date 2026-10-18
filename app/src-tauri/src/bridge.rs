@@ -56,7 +56,12 @@ pub fn run() {
         return;
     }
     match msg.get("type").and_then(|t| t.as_str()) {
-        Some("hello") => write_message(&serde_json::json!({ "ok": true, "app": env!("CARGO_PKG_VERSION"), "extension": extension_version() })),
+        Some("hello") => {
+            // The app shows "Extension connected" once the extension has said hello.
+            let _ = std::fs::create_dir_all(data_dir());
+            let _ = std::fs::write(data_dir().join("extension-seen"), super::engine::now().to_string());
+            write_message(&serde_json::json!({ "ok": true, "app": env!("CARGO_PKG_VERSION"), "extension": extension_version() }))
+        }
         Some("download") => {
             let dir = inbox();
             let _ = std::fs::create_dir_all(&dir);

@@ -77,13 +77,29 @@ async function renderSettings() {
       <div class="line"><div style="flex:1;min-width:0"><div>Site reader (yt-dlp)</div><div class="sub">${tools.ytdlp ? esc(tools.ytdlp) : 'Not found: YouTube and streams cannot download'}</div></div></div>
       <div class="line"><div style="flex:1;min-width:0"><div>Video joiner (FFmpeg, GPL-3.0: source at github.com/FFmpeg/FFmpeg, commit 089a48eb36)</div><div class="sub">${tools.ffmpeg ? esc(tools.ffmpeg) : 'Not found: video and audio stay in separate files'}</div></div></div></div>
     <div class="card wide"><h3>Browser extension and updates</h3>
-      <div class="line"><div style="flex:1;min-width:0"><div>Extension folder</div><div class="sub">One time only: in chrome://extensions turn on Developer mode, click Load unpacked and choose this folder. After that the app updates the extension for you.</div></div><button class="btn" id="s-ext">Show folder</button></div>
+      <div class="line"><div style="flex:1;min-width:0"><div>Browser extension</div><div class="sub">One time only, with a short guide. After that the app updates the extension for you.</div></div><button class="btn" id="s-ext">Set up</button></div>
       <div class="line"><div style="flex:1;min-width:0"><div>Updates</div><div class="sub" id="s-upd">The app checks omebly.com when it opens. Updates are signed, and nothing about you is sent.</div></div><button class="btn" id="s-check">Check now</button></div></div>
     <div class="card wide" style="display:flex;align-items:center;gap:14px"><div style="flex:1"><div style="font-weight:800">Omebly Downloader ${esc(tools.version)} · free and open source (GPL-3.0)</div><div class="sub">You are responsible for what you download. Download only what you have the right to save. Videos locked with copy protection are never downloaded.</div></div><button class="btn pri" id="s-save">Save</button></div>`;
-  $('s-ext').onclick = () => invoke('show_extension');
+  $('s-ext').onclick = () => openGuide();
   $('s-check').onclick = async () => { $('s-upd').textContent = 'Checking…'; const u = await invoke('check_update').catch(() => null); $('s-upd').textContent = u ? `Version ${u.version} is ready.` : 'You have the latest version.'; showUpdate(u); };
   $('s-save').onclick = async () => { await invoke('save_settings', { s: { folder: $('s-folder').value.trim() || s.folder, connections: +$('s-conn').value || 16, at_once: +$('s-once').value || 3 } }); $('s-save').textContent = 'Saved'; setTimeout(() => { if ($('s-save')) $('s-save').textContent = 'Save'; }, 1500); };
 }
+
+// The one-time guide for adding the extension; it turns green as soon as the extension says hello to the app.
+let guideTimer = null;
+const copy = async (text, btn) => { try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); } catch { /* select it by hand */ } };
+async function openGuide() {
+  const s = await invoke('extension_status');
+  $('ext-folder').textContent = s.folder;
+  $('ext-copy-folder').onclick = (e) => copy(s.folder, e.target);
+  if (!$('ext').open) $('ext').showModal();
+  const tick = async () => { const st = await invoke('extension_status'); $('ext-state').textContent = st.connected ? 'Connected. You can now use the green Omebly button on any page.' : 'Waiting for the extension…'; $('ext-state').classList.toggle('ok', st.connected); };
+  await tick(); clearInterval(guideTimer); guideTimer = setInterval(tick, 2000);
+}
+document.querySelectorAll('[data-copy]').forEach((b) => { b.onclick = () => copy(b.dataset.copy, b); });
+$('ext-later').onclick = () => $('ext').close();
+$('ext-done').onclick = () => { try { localStorage.setItem('omebly-ext-guide', '1'); } catch { /* fine */ } $('ext').close(); };
+$('ext').addEventListener('close', () => clearInterval(guideTimer));
 
 // A new version: one click downloads it, checks its signature, installs it and opens the app again.
 function showUpdate(u) {
@@ -126,5 +142,8 @@ $('q').addEventListener('input', () => { q = $('q').value.trim().toLowerCase(); 
   $('eng').innerHTML = tools.ytdlp && tools.ffmpeg ? 'Engines ready<br><span style="color:var(--faint)">yt-dlp and FFmpeg found</span>' : `<b>${!tools.ytdlp ? 'yt-dlp' : 'FFmpeg'} not found</b><br>YouTube and streams need it`;
   await listen('jobs', (ev) => { const was = jobs; jobs = ev.payload; if (view === 'done' && jobs.length > was.length) view = 'active'; render(); maybeAsk(); });
   maybeAsk();
+  // First start: the guide opens by itself until the extension is connected (or "Done" is pressed).
+  let guided = false; try { guided = !!localStorage.getItem('omebly-ext-guide'); } catch { /* show it */ }
+  if (!tools.test && !guided && !(await invoke('extension_status')).connected) openGuide();
   if (!tools.test) invoke('check_update').then(showUpdate).catch(() => {});
 })();
